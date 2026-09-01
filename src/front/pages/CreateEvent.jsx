@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { LocationPicker } from "../components/LocationPicker";
+import { ImageUpload } from "../components/ImageUpload"; // 1. Importamos el componente
 import { ImagePlus, Calendar, Info, MapPin, Phone } from "lucide-react";
 
 export const CreateEvent = () => {
@@ -29,7 +30,7 @@ export const CreateEvent = () => {
         contact_phone: "" 
     });
 
-    // Bloquear el scroll de la página si no está logueado para que no baje a ver el form difuminado
+    // Bloquear el scroll de la página si no está logueado
     useEffect(() => {
         if (!isAuthenticated) {
             document.body.style.overflow = "hidden";
@@ -61,25 +62,28 @@ export const CreateEvent = () => {
         });
     };
 
+    // 2. Función para actualizar la URL de la imagen en formData cuando termine de subir
+    const handleImageUploaded = (url) => {
+        setFormData({ ...formData, image_url: url });
+    };
+
     const handleSubmit = async (e) => {
         e.preventDefault();
         const form = e.currentTarget;
         
-        // 1. Verificación visual de Bootstrap (campos vacíos, mínimos requeridos)
+        // Verificación visual de Bootstrap
         if (form.checkValidity() === false) {
             e.stopPropagation();
             setValidated(true);
             setError("Por favor, revisa los campos en rojo y completa la información correctamente.");
-            // SCROLL SUAVE HACIA ARRIBA
             window.scrollTo({ top: 0, behavior: "smooth" });
             return;
         }
         
-        // 2. Verificación de ubicación en el mapa
+        // Verificación de ubicación en el mapa
         if (!formData.latitude || !formData.longitude) {
             setValidated(true);
             setError("Debes seleccionar la ubicación del evento en el mapa.");
-            // SCROLL SUAVE HACIA ARRIBA
             window.scrollTo({ top: 0, behavior: "smooth" });
             return;
         }
@@ -119,7 +123,6 @@ export const CreateEvent = () => {
     return (
         <div className="position-relative w-100 bg-light min-vh-100 py-5">
             
-            {/* PANTALLA DE BLOQUEO (Ahora usa position-fixed y vh-100 para estar siempre centrada en la cámara) */}
             {!isAuthenticated && (
                 <div 
                     className="position-fixed top-0 start-0 w-100 vh-100 d-flex flex-column justify-content-center align-items-center" 
@@ -217,11 +220,14 @@ export const CreateEvent = () => {
                                 </div>
                             </div>
 
+                            {/* 3. Reemplazamos el input viejo por el componente ImageUpload */}
                             <div className="mb-0">
-                                <label className="form-label fw-medium">URL de la Foto (Opcional)</label>
-                                <div className="input-group">
-                                    <span className="input-group-text bg-light border-0"><ImagePlus size={18} className="text-muted"/></span>
-                                    <input type="url" name="image_url" className="form-control bg-light border-0 py-2" value={formData.image_url} onChange={handleChange} placeholder="https://ejemplo.com/imagen.jpg" />
+                                <label className="form-label fw-medium d-flex align-items-center">
+                                    <ImagePlus size={18} className="me-2 text-danger"/>
+                                    Sube la foto del evento (Opcional)
+                                </label>
+                                <div className="bg-light p-3 rounded-3 border-0">
+                                    <ImageUpload onImageUploaded={handleImageUploaded} />
                                 </div>
                             </div>
                         </div>

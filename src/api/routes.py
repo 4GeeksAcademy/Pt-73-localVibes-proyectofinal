@@ -5,6 +5,8 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from flask_jwt_extended import create_access_token, jwt_required, get_jwt_identity
 from sqlalchemy import select, or_, delete
 from datetime import datetime
+import cloudinary.uploader
+from flask import Blueprint, request, jsonify
 
 api = Blueprint('api', __name__)
 CORS(api)
@@ -152,3 +154,27 @@ def add_favorite(event_id):
     db.session.add(new_favorite)
     db.session.commit()
     return jsonify({"message": "Agregado a favoritos"}), 201
+
+# =============================================================
+# 4. CLOUDINARY (Subida de imágenes)
+# =============================================================
+
+@api.route('/upload', methods=['POST'])
+def upload_image():
+    if 'image' not in request.files:
+        return jsonify({"error": "No se encontró la imagen"}), 400
+        
+    file = request.files['image']
+    
+    if file.filename == '':
+        return jsonify({"error": "No se seleccionó ningún archivo"}), 400
+
+    try:
+        # Subir directamente a Cloudinary
+        result = cloudinary.uploader.upload(file)
+        
+        return jsonify({
+            "url": result.get("secure_url")
+        }), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
