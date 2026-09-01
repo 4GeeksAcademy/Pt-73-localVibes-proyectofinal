@@ -4,6 +4,7 @@ import {
     User, Heart, Ticket, CheckCircle, Settings,
     Mic, LogOut, CalendarDays, MapPin, Clock, ArrowRight, Star, PlusCircle, Trash2, Shield, AlertTriangle
 } from "lucide-react";
+import { ImageUpload } from "../components/ImageUpload";
 
 
 export const Profile = () => {
@@ -313,17 +314,30 @@ const TabConfiguracion = ({ user }) => {
     const [birthdate, setBirthdate] = useState("1995-06-15");
     const [accountType, setAccountType] = useState("Persona");
     const [phone, setPhone] = useState("+58 412-1234567");
+    // El estado avatar sigue siendo un string (la URL única)
     const [avatar, setAvatar] = useState(user.avatar || "");
     const [saved, setSaved] = useState(false);
 
+    // NUEVA FUNCIÓN: Maneja la subida de la foto de perfil
+    const handleAvatarUploaded = (urls) => {
+        // Como Cloudinary devuelve un array, tomamos la primera imagen [0]
+        if (urls && urls.length > 0) {
+            setAvatar(urls[0]);
+            // Opcional: Podrías llamar a handleSubmit aquí para guardar automáticamente
+        }
+    };
+
     const handleSubmit = (e) => {
         e.preventDefault();
+        // Aquí iría tu lógica para enviar 'avatar' (y demás datos) a tu backend
+        console.log("Guardando perfil con avatar:", avatar);
         setSaved(true);
         setTimeout(() => setSaved(false), 3000);
     };
 
     return (
         <div className="animate__animated animate__fadeIn">
+            {/* ... (cabecera y alerta de guardado) ... */}
             <div className="mb-4">
                 <h1 className="fw-bold mb-2">Configuración de cuenta</h1>
                 <p className="text-muted mb-0">Actualiza tus datos personales, tipo de cuenta e información de contacto.</p>
@@ -334,6 +348,7 @@ const TabConfiguracion = ({ user }) => {
             <div className="card border-0 shadow-sm rounded-4 p-4 bg-white">
                 <form onSubmit={handleSubmit}>
                     <div className="row g-3">
+                        {/* ... (inputs de nombre, apellido, etc.) ... */}
                         <div className="col-12 col-md-6">
                             <label className="form-label fw-bold small">Nombre</label>
                             <input type="text" className="form-control" value={name} onChange={(e) => setName(e.target.value)} required />
@@ -361,10 +376,28 @@ const TabConfiguracion = ({ user }) => {
                                 <option value="Empresa">Empresa / Organizador</option>
                             </select>
                         </div>
+
+                        {/* CAMBIO AQUÍ: Reemplazamos el input de tipo "url" por el componente */}
                         <div className="col-12">
-                            <label className="form-label fw-bold small">URL de foto de perfil (Avatar)</label>
-                            <input type="url" className="form-control" value={avatar} onChange={(e) => setAvatar(e.target.value)} placeholder="https://..." />
+                            <label className="form-label fw-bold small d-block">Foto de perfil (Avatar)</label>
+                            
+                            <div className="d-flex align-items-center gap-3">
+                                {/* Vista previa circular actual */}
+                                <img 
+                                    src={avatar || "https://via.placeholder.com/100"} 
+                                    alt="Avatar" 
+                                    className="rounded-circle border shadow-sm" 
+                                    style={{ width: "80px", height: "80px", objectFit: "cover" }}
+                                />
+                                
+                                {/* Componente de subida (reutilizable) */}
+                                <div className="flex-grow-1">
+                                    <ImageUpload onImagesUploaded={handleAvatarUploaded} />
+                                    <small className="text-muted">Se recomienda una imagen cuadrada.</small>
+                                </div>
+                            </div>
                         </div>
+
                         <div className="col-12 mt-4">
                             <button type="submit" className="btn btn-danger rounded-pill px-4">Guardar cambios</button>
                         </div>
@@ -374,7 +407,6 @@ const TabConfiguracion = ({ user }) => {
         </div>
     );
 };
-
 
 // ============================================================
 // 5. PESTAÑA: CREAR EVENTO
