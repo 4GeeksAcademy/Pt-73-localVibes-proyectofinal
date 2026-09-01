@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { LocationPicker } from "../components/LocationPicker";
-import { ImageUpload } from "../components/ImageUpload"; // 1. Importamos el componente
+import { ImageUpload } from "../components/ImageUpload";
 import { ImagePlus, Calendar, Info, MapPin, Phone } from "lucide-react";
 
 export const CreateEvent = () => {
@@ -16,13 +16,14 @@ export const CreateEvent = () => {
     const [error, setError] = useState("");
     const [validated, setValidated] = useState(false);
 
+    // 1. CAMBIO AQUÍ: Cambiamos image_url por image_urls como un arreglo vacío []
     const [formData, setFormData] = useState({
         title: "",
         category_id: "",
         start_time: "",
         end_time: "",
         description: "",
-        image_url: "",
+        image_urls: [], 
         location_name: "", 
         address: "",       
         latitude: null,
@@ -62,9 +63,9 @@ export const CreateEvent = () => {
         });
     };
 
-    // 2. Función para actualizar la URL de la imagen en formData cuando termine de subir
-    const handleImageUploaded = (url) => {
-        setFormData({ ...formData, image_url: url });
+    // 2. CAMBIO AQUÍ: Actualizamos la función para que reciba el array de URLs y actualice image_urls
+    const handleImagesUploaded = (urls) => {
+        setFormData({ ...formData, image_urls: urls });
     };
 
     const handleSubmit = async (e) => {
@@ -220,14 +221,14 @@ export const CreateEvent = () => {
                                 </div>
                             </div>
 
-                            {/* 3. Reemplazamos el input viejo por el componente ImageUpload */}
+                            {/* 3. CAMBIO AQUÍ: Cambiamos onImageUploaded por onImagesUploaded */}
                             <div className="mb-0">
                                 <label className="form-label fw-medium d-flex align-items-center">
                                     <ImagePlus size={18} className="me-2 text-danger"/>
-                                    Sube la foto del evento (Opcional)
+                                    Sube las fotos del evento (Opcional)
                                 </label>
                                 <div className="bg-light p-3 rounded-3 border-0">
-                                    <ImageUpload onImageUploaded={handleImageUploaded} />
+                                    <ImageUpload onImagesUploaded={handleImagesUploaded} />
                                 </div>
                             </div>
                         </div>

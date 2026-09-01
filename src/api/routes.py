@@ -160,21 +160,23 @@ def add_favorite(event_id):
 # =============================================================
 
 @api.route('/upload', methods=['POST'])
-def upload_image():
-    if 'image' not in request.files:
-        return jsonify({"error": "No se encontró la imagen"}), 400
+def upload_images():
+    if 'images' not in request.files:
+        return jsonify({"error": "No se encontraron imágenes"}), 400
         
-    file = request.files['image']
-    
-    if file.filename == '':
-        return jsonify({"error": "No se seleccionó ningún archivo"}), 400
+    files = request.files.getlist('images')
+    uploaded_urls = []
 
     try:
-        # Subir directamente a Cloudinary
-        result = cloudinary.uploader.upload(file)
+        for file in files:
+            if file.filename != '':
+                # Subir cada archivo a Cloudinary
+                result = cloudinary.uploader.upload(file)
+                uploaded_urls.append(result.get("secure_url"))
         
         return jsonify({
-            "url": result.get("secure_url")
+            "urls": uploaded_urls
         }), 200
+        
     except Exception as e:
         return jsonify({"error": str(e)}), 500
