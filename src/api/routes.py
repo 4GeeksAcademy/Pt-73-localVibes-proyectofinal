@@ -1,10 +1,13 @@
 from flask import Flask, request, jsonify, url_for, Blueprint
 from api.models import db, User, Category, Event, FavoriteEvent, Ticket
+from api.models import db, User, Category, Event, FavoriteEvent, UserMedia
 from flask_cors import CORS
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask_jwt_extended import create_access_token, jwt_required, get_jwt_identity
 from sqlalchemy import select, or_, delete
 from datetime import datetime
+import cloudinary.uploader
+from flask import Blueprint, request, jsonify
 
 api = Blueprint('api', __name__)
 CORS(api)
@@ -213,3 +216,78 @@ def get_dashboard_stats():
         "saved_favorites": saved_favorites,
         "purchased_tickets": purchased_tickets
     }), 200
+    return jsonify({"message": "Agregado a favoritos"}), 201
+
+# =============================================================
+# 4. CLOUDINARY (Subida de imágenes)
+# =============================================================
+
+@api.route('/upload', methods=['POST'])
+def upload_images():
+    if 'images' not in request.files:
+        return jsonify({"error": "No se encontraron imágenes"}), 400
+        
+    files = request.files.getlist('images')
+    uploaded_urls = []
+
+    try:
+        for file in files:
+            if file.filename != '':
+                # Subir cada archivo a Cloudinary
+                result = cloudinary.uploader.upload(file)
+                uploaded_urls.append(result.get("secure_url"))
+        
+        return jsonify({
+            "urls": uploaded_urls
+        }), 200
+        
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+# =============================================================
+# 5. GESTIÓN DE IMÁGENES DEL USUARIO (Perfil y Galería)
+# =============================================================
+
+# Ruta para cambiar la FOTO DE PERFIL (Avatar)
+@api.route('/profile/avatar', methods=['PUT'])
+@jwt_required()
+def update_profile_avatar():
+    current_user_id = get_jwt_identity()
+    user = db.session.get(User, int(current_user_id))
+    
+    if not user:
+        return jsonify({"message": "Usuario no encontrado"}), 404
+        
+    data = request.get_json()
+    new_avatar_url = data.get("image_url")
+    
+    if not new_avatar_url:
+        return jsonify({"message": "Falta la URL de la imagen"}), 400
+        
+    user.avatar = new_avatar_url 
+    db.session.commit()
+    
+    return jsonify({"message": "Foto de perfil actualizada", "user": user.serialize()}), 200
+
+
+# Ruta para añadir una imagen a la GALERÍA / PUBLICACIONES
+@api.route('/user/media', methods=['POST'])
+@jwt_required()
+def add_media_image():
+    current_user_id = get_jwt_identity()
+    data = request.get_json()
+    
+    image_url = data.get("image_url")
+    
+    if not image_url:
+        return jsonify({"message": "Falta la URL de la imagen"}), 400
+        
+    new_media = UserMedia(
+        user_id=int(current_user_id),
+        image_url=image_url
+    )
+    
+    db.session.add(new_media)
+    db.session.commit()
+    
+    return jsonify({"message": "Imagen guardada en la galería", "media": new_media.serialize()}), 201

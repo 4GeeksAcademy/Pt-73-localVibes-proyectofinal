@@ -1,6 +1,9 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { Calendar, MapPin, AlignLeft, DollarSign, Users, Search, Clock, Mic, X, Plus, Lock } from "lucide-react";
+import { LocationPicker } from "../components/LocationPicker";
+import { ImageUpload } from "../components/ImageUpload";
+import { ImagePlus, Calendar, Info, MapPin, Phone } from "lucide-react";
 
 import { MapContainer, TileLayer, Marker, useMapEvents, useMap } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
@@ -124,6 +127,22 @@ export const CreateEvent = () => {
         fetch(`${backendUrl}/api/categories`).then(res => res.json()).then(setCategories).catch(console.error);
     }, [backendUrl]);
 
+    // 1. CAMBIO AQUÍ: Cambiamos image_url por image_urls como un arreglo vacío []
+    const [formData, setFormData] = useState({
+        title: "",
+        category_id: "",
+        start_time: "",
+        end_time: "",
+        description: "",
+        image_urls: "",
+        location_name: "",
+        address: "",
+        latitude: null,
+        longitude: null,
+        contact_phone: ""
+    });
+
+    // Bloquear el scroll de la página si no está logueado
     useEffect(() => {
         if (formData.event_date && formData.event_date < today) {
             setDateError("La fecha del evento no puede ser anterior al día de hoy.");
@@ -179,6 +198,13 @@ export const CreateEvent = () => {
         return `${hrs.toString().padStart(2, '0')}:${m}`;
     };
 
+    // 2. CAMBIO AQUÍ: Actualizamos la función para que reciba el array de URLs y actualice image_urls
+    const handleImagesUploaded = (urls) => {
+        if (urls && urls.length > 0) {
+            setFormData({ ...formData, image_url: urls[0] }); // <--- Guardamos solo el primer string
+        }
+    };
+
     const handleSubmit = async (e) => {
         e.preventDefault();
         setError("");
@@ -189,6 +215,28 @@ export const CreateEvent = () => {
         
         setIsSubmitting(true);
         const token = localStorage.getItem("token");
+        const form = e.currentTarget;
+
+        // Verificación visual de Bootstrap
+        if (form.checkValidity() === false) {
+            e.stopPropagation();
+            setValidated(true);
+            setError("Por favor, revisa los campos en rojo y completa la información correctamente.");
+            window.scrollTo({ top: 0, behavior: "smooth" });
+            return;
+        }
+
+        // Verificación de ubicación en el mapa
+        if (!formData.latitude || !formData.longitude) {
+            setValidated(true);
+            setError("Debes seleccionar la ubicación del evento en el mapa.");
+            window.scrollTo({ top: 0, behavior: "smooth" });
+            return;
+        }
+
+        setValidated(true);
+        setLoading(true);
+        setError("");
 
         try {
             let uploadedImagesUrls = [];
@@ -251,6 +299,28 @@ export const CreateEvent = () => {
                         <div className="d-flex gap-3 justify-content-center">
                             <Link to="/events" className="btn btn-light rounded-pill px-4 py-2 border">Volver</Link>
                             <Link to="/login" className="btn text-white rounded-pill px-4 py-2 shadow-sm" style={{ background: orangeGradient }}>Iniciar Sesión</Link>
+        <div className="position-relative w-100 bg-light min-vh-100 py-5">
+
+            {!isAuthenticated && (
+                <div
+                    className="position-fixed top-0 start-0 w-100 vh-100 d-flex flex-column justify-content-center align-items-center"
+                    style={{ zIndex: 1050, backgroundColor: "rgba(255,255,255,0.6)", backdropFilter: "blur(8px)" }}
+                >
+                    <div className="bg-white p-5 rounded-4 shadow-lg text-center mx-3 border" style={{ maxWidth: "450px" }}>
+                        <div className="bg-danger text-white rounded-circle d-flex align-items-center justify-content-center mx-auto mb-4 shadow" style={{ width: "80px", height: "80px" }}>
+                            <Calendar size={40} />
+                        </div>
+                        <h3 className="fw-bold mb-3">¡Comparte tu evento!</h3>
+                        <p className="text-muted mb-4">
+                            Para mantener nuestra comunidad segura, necesitas tener una cuenta para poder publicar eventos en el mapa.
+                        </p>
+                        <div className="d-flex flex-column gap-3">
+                            <Link to="/signup" className="btn btn-danger btn-lg rounded-pill fw-medium shadow-sm">
+                                Registrarse gratis
+                            </Link>
+                            <Link to="/login" className="btn btn-light border btn-lg rounded-pill fw-medium text-dark">
+                                Ya tengo una cuenta
+                            </Link>
                         </div>
                     </div>
                 </div>
@@ -273,6 +343,35 @@ export const CreateEvent = () => {
                             onUpload={(data) => setEventImage(data)} 
                         />
                     </div>
+            <div
+                className="container"
+                style={{
+                    maxWidth: "900px",
+                    filter: !isAuthenticated ? "blur(4px)" : "none",
+                    pointerEvents: !isAuthenticated ? "none" : "auto",
+                    userSelect: !isAuthenticated ? "none" : "auto"
+                }}
+            >
+                <div className="mb-4 text-center">
+                    <h2 className="fw-bold">Publicar Nuevo Evento</h2>
+                    <p className="text-muted">Completa los detalles para que la comunidad descubra tu evento.</p>
+                </div>
+
+                {error && <div className="alert alert-danger rounded-4 shadow-sm border-0"><Info size={18} className="me-2" />{error}</div>}
+
+                <form onSubmit={handleSubmit} className={`row g-4 needs-validation ${validated ? 'was-validated' : ''}`} noValidate>
+
+                    <div className="col-12 col-lg-7">
+                        <div className="card border-0 shadow-sm rounded-4 p-4 h-100">
+                            <h5 className="fw-bold d-flex align-items-center mb-4">
+                                <Info size={20} className="me-2 text-danger" /> Información Básica
+                            </h5>
+
+                            <div className="mb-3">
+                                <label className="form-label fw-medium">Nombre del Evento <span className="text-danger">*</span></label>
+                                <input type="text" name="title" className="form-control bg-light border-0 py-2" value={formData.title} onChange={handleChange} required placeholder="Ej: Concierto Sinfónico, Torneo de Pádel..." />
+                                <div className="invalid-feedback">El nombre del evento es obligatorio.</div>
+                            </div>
 
                     <div className="row g-4">
                         <div className="col-12 col-md-8">
@@ -311,6 +410,20 @@ export const CreateEvent = () => {
                                     <TimeSelect label="Hora de Fin" time={time} setTime={setTime} prefix="end" />
                                     
                                     {timeError && <div className="col-12 text-danger small fw-bold mt-2 d-flex align-items-center"><X size={16} className="me-1"/> {timeError}</div>}
+                            <div className="mb-3">
+                                <label className="form-label fw-medium">Descripción del Evento <span className="text-danger">*</span></label>
+                                <textarea
+                                    name="description"
+                                    className="form-control bg-light border-0 py-2"
+                                    rows="4"
+                                    value={formData.description}
+                                    onChange={handleChange}
+                                    required
+                                    minLength="50"
+                                    placeholder="Detalla de qué trata el evento... (Mínimo 50 caracteres)"
+                                ></textarea>
+                                <div className={`mt-1 small fw-medium text-end ${formData.description.length > 0 && formData.description.length < 50 ? 'text-danger' : 'text-muted'}`}>
+                                    {formData.description.length} / 50 caracteres mínimos
                                 </div>
                             </div>
                         </div>
@@ -322,6 +435,11 @@ export const CreateEvent = () => {
                                     <div className="form-check form-switch m-0">
                                         <input className="form-check-input shadow-none cursor-pointer" type="checkbox" role="switch" checked={hasGuests} onChange={() => { setHasGuests(!hasGuests); if(hasGuests) setGuestList([]); }}/>
                                     </div>
+                            <div className="mb-3">
+                                <label className="form-label fw-medium">Número de Contacto (Opcional)</label>
+                                <div className="input-group">
+                                    <span className="input-group-text bg-light border-0"><Phone size={18} className="text-muted" /></span>
+                                    <input type="tel" name="contact_phone" className="form-control bg-light border-0 py-2" value={formData.contact_phone} onChange={handleChange} placeholder="Ej: +58 412 123 4567" />
                                 </div>
                                 {hasGuests && (
                                     <div className="mt-3 pt-3 border-top">
@@ -358,6 +476,14 @@ export const CreateEvent = () => {
                                             <MapPin size={14} className="text-danger me-2 d-inline" />{loc.display_name}
                                         </div>
                                     ))}
+                            {/* 3. CAMBIO AQUÍ: Cambiamos onImageUploaded por onImagesUploaded */}
+                            <div className="mb-0">
+                                <label className="form-label fw-medium d-flex align-items-center">
+                                    <ImagePlus size={18} className="me-2 text-danger" />
+                                    Sube las fotos del evento (Opcional)
+                                </label>
+                                <div className="bg-light p-3 rounded-3 border-0">
+                                    <ImageUpload onImagesUploaded={handleImagesUploaded} />
                                 </div>
                             )}
                         </div>

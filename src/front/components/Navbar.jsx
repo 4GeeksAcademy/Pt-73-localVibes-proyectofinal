@@ -70,6 +70,26 @@ export const Navbar = () => {
             }}
         >
             <div className="container px-4 h-100 position-relative d-flex align-items-center justify-content-between">
+            {/* ENLACES CENTRALES */}
+            <div className="navbar-links">
+                <Link to="/" className={`nav-item ${location.pathname === '/' ? 'active' : ''}`}>
+                    <span className="nav-text">Inicio</span>
+                    {location.pathname === '/' && <div className="active-line"></div>}
+                </Link>
+                <Link to="/explorar" className={`nav-item ${location.pathname === '/explorar' ? 'active' : ''}`}>
+                    <span className="nav-text">Explorar</span>
+                    {location.pathname === '/explorar' && <div className="active-line"></div>}
+                </Link>
+                <Link to="/map" className="nav-item" style={{ textDecoration: 'none' }}>
+                    <span className="nav-text">Mapa</span>
+                    <span className="badge badge-orange">Interactivo</span>
+                </Link>
+                
+                {/* FAVORITOS CONTEO SINCRONIZADO */}
+                <Link to="/profile?tab=favoritos" className="nav-item" style={{ textDecoration: 'none' }}>
+                    <span className="nav-text">Favoritos</span>
+                    <span className="badge badge-pink">{favoritesCount}</span>
+                </Link>
                 
                 {/* LOGO (Izquierda) */}
                 <Link to="/" className="navbar-brand d-flex align-items-center me-0 h-100">
