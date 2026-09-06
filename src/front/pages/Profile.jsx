@@ -72,7 +72,7 @@ export const Profile = () => {
             case "historial": return <TabHistorial />;
             case "entradas": return <TabEntradas />;
             case "favoritos": return <TabFavoritos />;
-            case "configuracion": return <TabConfiguracion user={user} />;
+            case "configuracion": return <TabConfiguracion user={user} setUser={setUser} />;
             case "crear-evento": return <TabCrearEvento isVerified={user.is_verified || false} setActiveTab={setActiveTab} />;
             case "verificaciones": return <TabVerificaciones />;
             case "comunicaciones": return <TabComunicaciones />;
@@ -87,7 +87,7 @@ export const Profile = () => {
                 {/* SIDEBAR */}
                 <aside className="col-12 col-md-3 col-lg-2 bg-white border-end">
                     <div className="d-flex flex-column h-100 p-3 p-lg-4">
-                        
+
                         {/* PERFIL DEL USUARIO */}
                         <div className="text-center py-3 py-lg-4 mb-3" style={{ overflow: 'hidden' }}>
                             <img
@@ -308,47 +308,71 @@ const TabFavoritos = () => {
 // ============================================================
 // 4. PESTAÑA: CONFIGURACIÓN
 // ============================================================
-const TabConfiguracion = ({ user }) => {
+    const TabConfiguracion = ({ user, setUser }) => {
     const [name, setName] = useState(user.name || "");
     const [lastname, setLastname] = useState(user.lastname || "");
-    const [birthdate, setBirthdate] = useState("1995-06-15");
-    const [accountType, setAccountType] = useState("Persona");
-    const [phone, setPhone] = useState("+58 412-1234567");
-    // El estado avatar sigue siendo un string (la URL única)
     const [avatar, setAvatar] = useState(user.avatar || "");
     const [saved, setSaved] = useState(false);
+    const [loading, setLoading] = useState(false);
 
-    // NUEVA FUNCIÓN: Maneja la subida de la foto de perfil
     const handleAvatarUploaded = (urls) => {
-        // Como Cloudinary devuelve un array, tomamos la primera imagen [0]
         if (urls && urls.length > 0) {
-            setAvatar(urls[0]);
-            // Opcional: Podrías llamar a handleSubmit aquí para guardar automáticamente
+            setAvatar(urls[0]); // Esto actualiza la vista previa en el círculo
         }
     };
 
-    const handleSubmit = (e) => {
+    const handleSubmit = async (e) => {
         e.preventDefault();
-        // Aquí iría tu lógica para enviar 'avatar' (y demás datos) a tu backend
-        console.log("Guardando perfil con avatar:", avatar);
-        setSaved(true);
-        setTimeout(() => setSaved(false), 3000);
+        setLoading(true);
+        const token = localStorage.getItem("token");
+        const backendUrl = import.meta.env.VITE_BACKEND_URL;
+
+        try {
+            // 1. Llamada al backend para guardar en la Base de Datos
+            const response = await fetch(`${backendUrl}/api/profile/avatar`, {
+                method: "PUT",
+                headers: {
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer ${token}` // <--- ESTO QUITA EL ERROR 401
+                },
+                body: JSON.stringify({
+                    image_url: avatar,
+                    name: name,
+                    lastname: lastname
+                })
+            });
+
+            if (response.ok) {
+                const updatedUser = await response.json();
+
+                // 2. Actualizamos el estado global para que el Sidebar cambie la foto al instante
+                setUser({ ...user, avatar: avatar, name: name, lastname: lastname });
+
+                setSaved(true);
+                setTimeout(() => setSaved(false), 3000);
+            } else {
+                alert("Error al guardar los cambios");
+            }
+        } catch (error) {
+            console.error("Error:", error);
+            alert("No se pudo conectar con el servidor");
+        } finally {
+            setLoading(false);
+        }
     };
 
     return (
         <div className="animate__animated animate__fadeIn">
-            {/* ... (cabecera y alerta de guardado) ... */}
             <div className="mb-4">
                 <h1 className="fw-bold mb-2">Configuración de cuenta</h1>
-                <p className="text-muted mb-0">Actualiza tus datos personales, tipo de cuenta e información de contacto.</p>
+                <p className="text-muted mb-0">Actualiza tus datos personales y tu foto de perfil.</p>
             </div>
 
-            {saved && <div className="alert alert-success rounded-3">¡Cambios guardados con éxito!</div>}
+            {saved && <div className="alert alert-success rounded-3 shadow-sm border-0">¡Cambios guardados con éxito!</div>}
 
             <div className="card border-0 shadow-sm rounded-4 p-4 bg-white">
                 <form onSubmit={handleSubmit}>
                     <div className="row g-3">
-                        {/* ... (inputs de nombre, apellido, etc.) ... */}
                         <div className="col-12 col-md-6">
                             <label className="form-label fw-bold small">Nombre</label>
                             <input type="text" className="form-control" value={name} onChange={(e) => setName(e.target.value)} required />
@@ -357,40 +381,16 @@ const TabConfiguracion = ({ user }) => {
                             <label className="form-label fw-bold small">Apellido</label>
                             <input type="text" className="form-control" value={lastname} onChange={(e) => setLastname(e.target.value)} required />
                         </div>
-                        <div className="col-12 col-md-6">
-                            <label className="form-label fw-bold small">Correo electrónico (No editable)</label>
-                            <input type="email" className="form-control bg-light" value={user.email} disabled />
-                        </div>
-                        <div className="col-12 col-md-6">
-                            <label className="form-label fw-bold small">Teléfono (Opcional)</label>
-                            <input type="tel" className="form-control" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+58 ..." />
-                        </div>
-                        <div className="col-12 col-md-6">
-                            <label className="form-label fw-bold small">Fecha de nacimiento</label>
-                            <input type="date" className="form-control" value={birthdate} onChange={(e) => setBirthdate(e.target.value)} />
-                        </div>
-                        <div className="col-12 col-md-6">
-                            <label className="form-label fw-bold small">Tipo de cuenta</label>
-                            <select className="form-select" value={accountType} onChange={(e) => setAccountType(e.target.value)}>
-                                <option value="Persona">Persona</option>
-                                <option value="Empresa">Empresa / Organizador</option>
-                            </select>
-                        </div>
 
-                        {/* CAMBIO AQUÍ: Reemplazamos el input de tipo "url" por el componente */}
                         <div className="col-12">
-                            <label className="form-label fw-bold small d-block">Foto de perfil (Avatar)</label>
-                            
-                            <div className="d-flex align-items-center gap-3">
-                                {/* Vista previa circular actual */}
-                                <img 
-                                    src={avatar || "https://via.placeholder.com/100"} 
-                                    alt="Avatar" 
-                                    className="rounded-circle border shadow-sm" 
-                                    style={{ width: "80px", height: "80px", objectFit: "cover" }}
+                            <label className="form-label fw-bold small d-block mb-3">Foto de perfil</label>
+                            <div className="d-flex align-items-center gap-4">
+                                <img
+                                    src={avatar || "https://picsum.photos/seed/profile/160/160"}
+                                    alt="Avatar"
+                                    className="rounded-circle border shadow-sm"
+                                    style={{ width: "100px", height: "100px", objectFit: "cover" }}
                                 />
-                                
-                                {/* Componente de subida (reutilizable) */}
                                 <div className="flex-grow-1">
                                     <ImageUpload onImagesUploaded={handleAvatarUploaded} />
                                     <small className="text-muted">Se recomienda una imagen cuadrada.</small>
@@ -399,7 +399,9 @@ const TabConfiguracion = ({ user }) => {
                         </div>
 
                         <div className="col-12 mt-4">
-                            <button type="submit" className="btn btn-danger rounded-pill px-4">Guardar cambios</button>
+                            <button type="submit" className="btn btn-danger rounded-pill px-5" disabled={loading}>
+                                {loading ? "Guardando..." : "Guardar cambios"}
+                            </button>
                         </div>
                     </div>
                 </form>
@@ -643,9 +645,8 @@ const ProfileMenuItem = ({ icon, text, active = false, onClick }) => {
     return (
         <button
             onClick={onClick}
-            className={`btn text-start d-flex align-items-center gap-3 w-100 rounded-3 p-3 border-0 transition-all ${
-                active ? "bg-danger bg-opacity-10 text-danger fw-bold" : "bg-transparent text-dark"
-            }`}
+            className={`btn text-start d-flex align-items-center gap-3 w-100 rounded-3 p-3 border-0 transition-all ${active ? "bg-danger bg-opacity-10 text-danger fw-bold" : "bg-transparent text-dark"
+                }`}
         >
             <div className="flex-shrink-0">{icon}</div>
             <div className="flex-grow-1"><span className="d-block">{text}</span></div>

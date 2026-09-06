@@ -7,7 +7,7 @@ from typing import Optional, List
 db = SQLAlchemy()
 
 # -------------------------------------------------------------
-# 1. TABLA USER
+# 1. TABLA USER (Actualizada)
 # -------------------------------------------------------------
 class User(db.Model):
     __tablename__ = 'users'
@@ -18,6 +18,10 @@ class User(db.Model):
     password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
     name: Mapped[str] = mapped_column(String(100), nullable=False)
     lastname: Mapped[str] = mapped_column(String(100), nullable=False)
+    
+    # NUEVO: Campo para la foto de perfil directa
+    avatar: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+
     role: Mapped[Optional[str]] = mapped_column(String(50), default="user")
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     email_verify: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
@@ -26,6 +30,8 @@ class User(db.Model):
     # Relaciones
     events: Mapped[List["Event"]] = relationship(back_populates="organizer")
     favorite_events: Mapped[List["FavoriteEvent"]] = relationship(back_populates="user")
+    # Relación con la nueva tabla de fotos
+    media_images: Mapped[List["UserMedia"]] = relationship(back_populates="user")
 
     def serialize(self):
         return {
@@ -34,9 +40,8 @@ class User(db.Model):
             "email": self.email,
             "name": self.name,
             "lastname": self.lastname,
+            "avatar": self.avatar, # Incluido en el serialize
             "role": self.role,
-            "is_active": self.is_active,
-            "email_verify": self.email_verify,
             "created_at": self.created_at.isoformat() if self.created_at else None
         }
 
@@ -131,4 +136,26 @@ class FavoriteEvent(db.Model):
             "user_id": self.user_id,
             "event_id": self.event_id,
             "created_at": self.created_at.isoformat() if self.created_at else None
+        }
+
+# -------------------------------------------------------------
+# 5. TABLA USER_MEDIA (Para publicaciones o galería)
+# -------------------------------------------------------------
+class UserMedia(db.Model):
+    __tablename__ = 'user_media'
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    image_url: Mapped[str] = mapped_column(String(500), nullable=False)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    # Relación con User
+    user: Mapped["User"] = relationship(back_populates="media_images")
+
+    def serialize(self):
+        return {
+            "id": self.id,
+            "image_url": self.image_url,
+            "user_id": self.user_id,
+            "created_at": self.created_at.isoformat()
         }
