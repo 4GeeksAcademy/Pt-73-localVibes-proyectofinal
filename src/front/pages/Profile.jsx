@@ -415,93 +415,54 @@ const TabFavoritos = () => {
 // ============================================================
 const TabCrearEvento = ({ isVerified, setActiveTab }) => {
     const [eventCreated, setEventCreated] = useState(false);
+    
+    // 1. Crea un estado para la URL de la foto
+    const [imageUrl, setImageUrl] = useState(""); 
+    
+    // 2. Crea estados para los campos básicos
+    const [title, setTitle] = useState("");
+    const [catId, setCatId] = useState("1");
 
-    const handleCreateEvent = (e) => {
+    const handleCreateEvent = async (e) => {
         e.preventDefault();
-        setEventCreated(true);
+        const token = localStorage.getItem("token");
+
+        const response = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/events`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${token}`
+            },
+            body: JSON.stringify({
+                title: title,
+                category_id: catId,
+                image_url: imageUrl, // <--- MANDAMOS LA URL DE CLOUDINARY
+                latitude: 10.5,
+                longitude: -66.9,
+                description: "Descripción de prueba"
+            })
+        });
+
+        if (response.ok) setEventCreated(true);
     };
 
-    if (!isVerified) {
-        return (
-            <div className="animate__animated animate__fadeIn text-center py-5">
-                <div className="card border-0 shadow-sm rounded-4 p-5 bg-white mx-auto" style={{ maxWidth: "550px" }}>
-                    <div className="bg-warning bg-opacity-10 text-warning d-flex align-items-center justify-content-center mx-auto mb-4" style={{ width: "80px", height: "80px", borderRadius: "50%" }}>
-                        <AlertTriangle size={36} />
-                    </div>
-                    <h3 className="fw-bold mb-2 text-dark">Verificación de RIF requerida</h3>
-                    <p className="text-muted mb-4">Para poder publicar eventos oficiales y vender entradas en Local Vibes, es obligatorio tener tu cuenta de empresa o RIF verificado.</p>
-                    <button onClick={() => setActiveTab("verificaciones")} className="btn btn-danger rounded-pill px-5 py-2 fw-bold">
-                        Ir a Verificaciones
-                    </button>
-                </div>
-            </div>
-        );
-    }
-
     return (
-        <div className="animate__animated animate__fadeIn">
-            <div className="mb-4">
-                <h1 className="fw-bold mb-2">Crear un nuevo evento</h1>
-                <p className="text-muted mb-0">Publica tu evento, añade su cronograma y hazlo visible en la plataforma.</p>
-            </div>
+        // ... resto del código ...
+        <form onSubmit={handleCreateEvent}>
+             {/* ... otros campos ... */}
+             
+             <div className="col-12 mb-3">
+                <label className="form-label fw-bold small">Imagen del Evento</label>
+                
+                {/* Muestra una previa si ya se subió */}
+                {imageUrl && <img src={imageUrl} className="d-block mb-2 rounded" style={{width: "200px"}} />}
+                
+                {/* USA TU COMPONENTE AQUÍ */}
+                <ImageUpload onImagesUploaded={(urls) => setImageUrl(urls[0])} />
+             </div>
 
-            {eventCreated ? (
-                <div className="alert alert-success p-4 rounded-4 text-center">
-                    <h4 className="fw-bold">¡Evento publicado con éxito! 🎉</h4>
-                    <p className="mb-0">Ya se encuentra activo en la cartelera de Local Vibes.</p>
-                    <button onClick={() => setEventCreated(false)} className="btn btn-dark mt-3 rounded-pill">Crear otro evento</button>
-                </div>
-            ) : (
-                <div className="card border-0 shadow-sm rounded-4 p-4 bg-white">
-                    <form onSubmit={handleCreateEvent}>
-                        <div className="row g-3">
-                            <div className="col-12 col-md-6">
-                                <label className="form-label fw-bold small">Título del evento</label>
-                                <input type="text" className="form-control" placeholder="Ej. Festival Rock Urbano" required />
-                            </div>
-                            <div className="col-12 col-md-6">
-                                <label className="form-label fw-bold small">Categoría</label>
-                                <select className="form-select">
-                                    <option>Música</option>
-                                    <option>Gastronomía</option>
-                                    <option>Teatro</option>
-                                    <option>Deportes</option>
-                                    <option>Arte</option>
-                                    <option>Naturaleza</option>
-                                </select>
-                            </div>
-                            <div className="col-12 col-md-6">
-                                <label className="form-label fw-bold small">Fecha</label>
-                                <input type="date" className="form-control" required />
-                            </div>
-                            <div className="col-12 col-md-6">
-                                <label className="form-label fw-bold small">Hora de inicio</label>
-                                <input type="time" className="form-control" required />
-                            </div>
-                            <div className="col-12">
-                                <label className="form-label fw-bold small">Ubicación exacta / Local</label>
-                                <input type="text" className="form-control" placeholder="Ej. Centro Cultural, Caracas" required />
-                            </div>
-                            <div className="col-12">
-                                <label className="form-label fw-bold small">URL de la imagen del evento</label>
-                                <input type="url" className="form-control" placeholder="https://images.unsplash.com/..." required />
-                            </div>
-                            <div className="col-12">
-                                <label className="form-label fw-bold small">Cronograma / Itinerario (Horas clave)</label>
-                                <textarea className="form-control" rows="3" placeholder="Ej: 5:00 PM - Apertura de puertas&#10;6:30 PM - Banda invitado&#10;9:00 PM - Concierto principal" required></textarea>
-                            </div>
-                            <div className="col-12">
-                                <label className="form-label fw-bold small">Descripción detallada</label>
-                                <textarea className="form-control" rows="3" placeholder="Cuéntale a la gente por qué no deben perdérselo..." required></textarea>
-                            </div>
-                            <div className="col-12 mt-4">
-                                <button type="submit" className="btn btn-danger rounded-pill px-5 py-2">Publicar evento</button>
-                            </div>
-                        </div>
-                    </form>
-                </div>
-            )}
-        </div>
+             <button type="submit" className="btn btn-danger">Publicar</button>
+        </form>
     );
 };
 

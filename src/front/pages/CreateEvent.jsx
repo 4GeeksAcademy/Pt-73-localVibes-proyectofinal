@@ -23,12 +23,12 @@ export const CreateEvent = () => {
         start_time: "",
         end_time: "",
         description: "",
-        image_urls: [], 
-        location_name: "", 
-        address: "",       
+        image_urls: "",
+        location_name: "",
+        address: "",
         latitude: null,
         longitude: null,
-        contact_phone: "" 
+        contact_phone: ""
     });
 
     // Bloquear el scroll de la página si no está logueado
@@ -65,13 +65,15 @@ export const CreateEvent = () => {
 
     // 2. CAMBIO AQUÍ: Actualizamos la función para que reciba el array de URLs y actualice image_urls
     const handleImagesUploaded = (urls) => {
-        setFormData({ ...formData, image_urls: urls });
+        if (urls && urls.length > 0) {
+            setFormData({ ...formData, image_url: urls[0] }); // <--- Guardamos solo el primer string
+        }
     };
 
     const handleSubmit = async (e) => {
         e.preventDefault();
         const form = e.currentTarget;
-        
+
         // Verificación visual de Bootstrap
         if (form.checkValidity() === false) {
             e.stopPropagation();
@@ -80,7 +82,7 @@ export const CreateEvent = () => {
             window.scrollTo({ top: 0, behavior: "smooth" });
             return;
         }
-        
+
         // Verificación de ubicación en el mapa
         if (!formData.latitude || !formData.longitude) {
             setValidated(true);
@@ -123,10 +125,10 @@ export const CreateEvent = () => {
 
     return (
         <div className="position-relative w-100 bg-light min-vh-100 py-5">
-            
+
             {!isAuthenticated && (
-                <div 
-                    className="position-fixed top-0 start-0 w-100 vh-100 d-flex flex-column justify-content-center align-items-center" 
+                <div
+                    className="position-fixed top-0 start-0 w-100 vh-100 d-flex flex-column justify-content-center align-items-center"
                     style={{ zIndex: 1050, backgroundColor: "rgba(255,255,255,0.6)", backdropFilter: "blur(8px)" }}
                 >
                     <div className="bg-white p-5 rounded-4 shadow-lg text-center mx-3 border" style={{ maxWidth: "450px" }}>
@@ -149,10 +151,10 @@ export const CreateEvent = () => {
                 </div>
             )}
 
-            <div 
-                className="container" 
-                style={{ 
-                    maxWidth: "900px", 
+            <div
+                className="container"
+                style={{
+                    maxWidth: "900px",
                     filter: !isAuthenticated ? "blur(4px)" : "none",
                     pointerEvents: !isAuthenticated ? "none" : "auto",
                     userSelect: !isAuthenticated ? "none" : "auto"
@@ -163,16 +165,16 @@ export const CreateEvent = () => {
                     <p className="text-muted">Completa los detalles para que la comunidad descubra tu evento.</p>
                 </div>
 
-                {error && <div className="alert alert-danger rounded-4 shadow-sm border-0"><Info size={18} className="me-2"/>{error}</div>}
+                {error && <div className="alert alert-danger rounded-4 shadow-sm border-0"><Info size={18} className="me-2" />{error}</div>}
 
                 <form onSubmit={handleSubmit} className={`row g-4 needs-validation ${validated ? 'was-validated' : ''}`} noValidate>
-                    
+
                     <div className="col-12 col-lg-7">
                         <div className="card border-0 shadow-sm rounded-4 p-4 h-100">
                             <h5 className="fw-bold d-flex align-items-center mb-4">
                                 <Info size={20} className="me-2 text-danger" /> Información Básica
                             </h5>
-                            
+
                             <div className="mb-3">
                                 <label className="form-label fw-medium">Nombre del Evento <span className="text-danger">*</span></label>
                                 <input type="text" name="title" className="form-control bg-light border-0 py-2" value={formData.title} onChange={handleChange} required placeholder="Ej: Concierto Sinfónico, Torneo de Pádel..." />
@@ -197,13 +199,13 @@ export const CreateEvent = () => {
 
                             <div className="mb-3">
                                 <label className="form-label fw-medium">Descripción del Evento <span className="text-danger">*</span></label>
-                                <textarea 
-                                    name="description" 
-                                    className="form-control bg-light border-0 py-2" 
-                                    rows="4" 
-                                    value={formData.description} 
-                                    onChange={handleChange} 
-                                    required 
+                                <textarea
+                                    name="description"
+                                    className="form-control bg-light border-0 py-2"
+                                    rows="4"
+                                    value={formData.description}
+                                    onChange={handleChange}
+                                    required
                                     minLength="50"
                                     placeholder="Detalla de qué trata el evento... (Mínimo 50 caracteres)"
                                 ></textarea>
@@ -216,7 +218,7 @@ export const CreateEvent = () => {
                             <div className="mb-3">
                                 <label className="form-label fw-medium">Número de Contacto (Opcional)</label>
                                 <div className="input-group">
-                                    <span className="input-group-text bg-light border-0"><Phone size={18} className="text-muted"/></span>
+                                    <span className="input-group-text bg-light border-0"><Phone size={18} className="text-muted" /></span>
                                     <input type="tel" name="contact_phone" className="form-control bg-light border-0 py-2" value={formData.contact_phone} onChange={handleChange} placeholder="Ej: +58 412 123 4567" />
                                 </div>
                             </div>
@@ -224,7 +226,7 @@ export const CreateEvent = () => {
                             {/* 3. CAMBIO AQUÍ: Cambiamos onImageUploaded por onImagesUploaded */}
                             <div className="mb-0">
                                 <label className="form-label fw-medium d-flex align-items-center">
-                                    <ImagePlus size={18} className="me-2 text-danger"/>
+                                    <ImagePlus size={18} className="me-2 text-danger" />
                                     Sube las fotos del evento (Opcional)
                                 </label>
                                 <div className="bg-light p-3 rounded-3 border-0">
