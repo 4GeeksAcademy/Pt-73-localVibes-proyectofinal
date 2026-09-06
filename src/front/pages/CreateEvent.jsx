@@ -1,16 +1,11 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useNavigate, Link } from "react-router-dom";
-import { Calendar, MapPin, AlignLeft, DollarSign, Users, Search, Clock, Mic, X, Plus, Lock } from "lucide-react";
+import { Calendar as CalendarIcon, Calendar, MapPin, AlignLeft, DollarSign, Users, Search, Clock, Mic, X, Plus, Lock, Info, Phone, ImagePlus } from "lucide-react";
 import { LocationPicker } from "../components/LocationPicker";
 import { ImageUpload } from "../components/ImageUpload";
-import { ImagePlus, Calendar, Info, MapPin, Phone } from "lucide-react";
-
 import { MapContainer, TileLayer, Marker, useMapEvents, useMap } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 import L from "leaflet";
-
-// 👇 Importación del componente de tu compañero
-import { ImageUpload } from "../components/ImageUpload"; 
 
 // =========================================================
 // MINI COMPONENTES
@@ -92,18 +87,31 @@ export const CreateEvent = () => {
     const [categories, setCategories] = useState([]);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [error, setError] = useState("");
+    const [validated, setValidated] = useState(false);
     
     // Estados de Validación
     const [timeError, setTimeError] = useState("");
     const [dateError, setDateError] = useState("");
 
-    // 👇 Estado único para la imagen del evento (reemplaza a imageFile y previewUrl)
+    // Estado único para la imagen del evento
     const [eventImage, setEventImage] = useState(null); 
 
-    // Formulario Principal
+    // Formulario Principal unificado
     const [formData, setFormData] = useState({
-        title: "", category_id: "", location_name: "", address: "", event_date: "",
-        description: "", price: "", capacity: "", latitude: "", longitude: ""    
+        title: "",
+        category_id: "",
+        start_time: "",
+        end_time: "",
+        description: "",
+        image_url: "",
+        location_name: "",
+        address: "",
+        event_date: "",
+        latitude: null,
+        longitude: null,
+        contact_phone: "",
+        price: "",
+        capacity: ""
     });
 
     const [time, setTime] = useState({
@@ -118,7 +126,6 @@ export const CreateEvent = () => {
     
     const [searchResults, setSearchResults] = useState([]);
     const [showDropdown, setShowDropdown] = useState(false);
-    const [isSearchingMap, setIsSearchingMap] = useState(false);
     const searchTimeoutRef = useRef(null);
 
     // ======================== EFECTOS ========================
@@ -127,22 +134,6 @@ export const CreateEvent = () => {
         fetch(`${backendUrl}/api/categories`).then(res => res.json()).then(setCategories).catch(console.error);
     }, [backendUrl]);
 
-    // 1. CAMBIO AQUÍ: Cambiamos image_url por image_urls como un arreglo vacío []
-    const [formData, setFormData] = useState({
-        title: "",
-        category_id: "",
-        start_time: "",
-        end_time: "",
-        description: "",
-        image_urls: "",
-        location_name: "",
-        address: "",
-        latitude: null,
-        longitude: null,
-        contact_phone: ""
-    });
-
-    // Bloquear el scroll de la página si no está logueado
     useEffect(() => {
         if (formData.event_date && formData.event_date < today) {
             setDateError("La fecha del evento no puede ser anterior al día de hoy.");
@@ -180,13 +171,11 @@ export const CreateEvent = () => {
         const query = e.target.value;
         setFormData({ ...formData, address: query });
         if (query.length > 3) {
-            setIsSearchingMap(true);
             clearTimeout(searchTimeoutRef.current);
             searchTimeoutRef.current = setTimeout(async () => {
                 const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=5&countrycodes=ve`);
                 setSearchResults(await res.json());
                 setShowDropdown(true);
-                setIsSearchingMap(false);
             }, 700);
         } else setShowDropdown(false);
     };
@@ -198,10 +187,9 @@ export const CreateEvent = () => {
         return `${hrs.toString().padStart(2, '0')}:${m}`;
     };
 
-    // 2. CAMBIO AQUÍ: Actualizamos la función para que reciba el array de URLs y actualice image_urls
     const handleImagesUploaded = (urls) => {
         if (urls && urls.length > 0) {
-            setFormData({ ...formData, image_url: urls[0] }); // <--- Guardamos solo el primer string
+            setFormData(prev => ({ ...prev, image_url: urls[0] }));
         }
     };
 
@@ -213,11 +201,7 @@ export const CreateEvent = () => {
         if (timeError) return setError("Corrige las horas del evento.");
         if (!formData.event_date) return setError("Debes seleccionar la fecha del evento.");
         
-        setIsSubmitting(true);
-        const token = localStorage.getItem("token");
         const form = e.currentTarget;
-
-        // Verificación visual de Bootstrap
         if (form.checkValidity() === false) {
             e.stopPropagation();
             setValidated(true);
@@ -226,7 +210,6 @@ export const CreateEvent = () => {
             return;
         }
 
-        // Verificación de ubicación en el mapa
         if (!formData.latitude || !formData.longitude) {
             setValidated(true);
             setError("Debes seleccionar la ubicación del evento en el mapa.");
@@ -235,26 +218,22 @@ export const CreateEvent = () => {
         }
 
         setValidated(true);
-        setLoading(true);
-        setError("");
+        setIsSubmitting(true);
+        const token = localStorage.getItem("token");
 
         try {
             let uploadedImagesUrls = [];
             
-            // 👇 LÓGICA DE SUBIDA INTELIGENTE 
             if (eventImage) {
                 if (typeof eventImage === "string") {
-                    // Si el componente devolvió una URL ya subida
                     uploadedImagesUrls.push(eventImage);
+                } else if (Array.isArray(eventImage) && eventImage.length > 0) {
+                    uploadedImagesUrls = eventImage;
                 } else {
-                    // Si el componente devolvió un archivo (File) que debemos subir aquí
-                    const cloudData = new FormData();
-                    cloudData.append("file", eventImage); 
-                    cloudData.append("upload_preset", "TU_UPLOAD_PRESET");
-                    const cloudRes = await fetch(`https://api.cloudinary.com/v1_1/TU_CLOUD_NAME/image/upload`, { method: "POST", body: cloudData });
-                    if (!cloudRes.ok) throw new Error("Error subiendo la imagen a Cloudinary");
-                    uploadedImagesUrls.push((await cloudRes.json()).secure_url);
+                    uploadedImagesUrls.push(formData.image_url);
                 }
+            } else if (formData.image_url) {
+                uploadedImagesUrls.push(formData.image_url);
             }
 
             const startTime24 = compileTime(time.startH, time.startM, time.startA);
@@ -283,8 +262,11 @@ export const CreateEvent = () => {
             if (response.ok) navigate("/events"); 
             else throw new Error((await response.json()).message || "Error al crear el evento");
 
-        } catch (err) { setError(err.message); } 
-        finally { setIsSubmitting(false); }
+        } catch (err) { 
+            setError(err.message); 
+        } finally { 
+            setIsSubmitting(false); 
+        }
     };
 
     return (
@@ -292,67 +274,20 @@ export const CreateEvent = () => {
             
             {!isLoggedIn && (
                 <div className="position-absolute top-0 start-0 w-100 h-100 d-flex flex-column justify-content-center align-items-center" style={{ zIndex: 9999, backdropFilter: "blur(8px)", backgroundColor: "rgba(255, 255, 255, 0.5)" }}>
-                    <div className="card shadow-lg border-0 rounded-4 p-5 text-center animate__animated animate__zoomIn" style={{ maxWidth: "450px" }}>
+                    <div className="card shadow-lg border-0 rounded-4 p-5 text-center" style={{ maxWidth: "450px" }}>
                         <Lock size={48} className="text-danger mx-auto mb-4" />
                         <h3 className="fw-bold mb-3">Acceso Restringido</h3>
                         <p className="text-muted mb-4">Inicia sesión para publicar y gestionar eventos.</p>
                         <div className="d-flex gap-3 justify-content-center">
                             <Link to="/events" className="btn btn-light rounded-pill px-4 py-2 border">Volver</Link>
                             <Link to="/login" className="btn text-white rounded-pill px-4 py-2 shadow-sm" style={{ background: orangeGradient }}>Iniciar Sesión</Link>
-        <div className="position-relative w-100 bg-light min-vh-100 py-5">
-
-            {!isAuthenticated && (
-                <div
-                    className="position-fixed top-0 start-0 w-100 vh-100 d-flex flex-column justify-content-center align-items-center"
-                    style={{ zIndex: 1050, backgroundColor: "rgba(255,255,255,0.6)", backdropFilter: "blur(8px)" }}
-                >
-                    <div className="bg-white p-5 rounded-4 shadow-lg text-center mx-3 border" style={{ maxWidth: "450px" }}>
-                        <div className="bg-danger text-white rounded-circle d-flex align-items-center justify-content-center mx-auto mb-4 shadow" style={{ width: "80px", height: "80px" }}>
-                            <Calendar size={40} />
-                        </div>
-                        <h3 className="fw-bold mb-3">¡Comparte tu evento!</h3>
-                        <p className="text-muted mb-4">
-                            Para mantener nuestra comunidad segura, necesitas tener una cuenta para poder publicar eventos en el mapa.
-                        </p>
-                        <div className="d-flex flex-column gap-3">
-                            <Link to="/signup" className="btn btn-danger btn-lg rounded-pill fw-medium shadow-sm">
-                                Registrarse gratis
-                            </Link>
-                            <Link to="/login" className="btn btn-light border btn-lg rounded-pill fw-medium text-dark">
-                                Ya tengo una cuenta
-                            </Link>
                         </div>
                     </div>
                 </div>
             )}
 
-            <div className="container" style={{ maxWidth: "800px" }}>
+            <div className="container" style={{ maxWidth: "900px", filter: !isLoggedIn ? "blur(4px)" : "none", pointerEvents: !isLoggedIn ? "none" : "auto" }}>
                 <div className="text-center mb-5">
-                    <h2 className="fw-bold" style={{ color: "#2b2b2b" }}>Publica tu Evento</h2>
-                </div>
-
-                {error && <div className="alert alert-danger rounded-4 shadow-sm border-0">{error}</div>}
-
-                <form onSubmit={handleSubmit} className="bg-white p-4 p-md-5 rounded-4 shadow-sm border-0">
-                    
-                    {/* 👇 COMPONENTE DE IMAGEN DE TU COMPAÑERO 👇 */}
-                    <div className="mb-4">
-                        <label className="form-label fw-bold">Imagen del evento (Flyer)</label>
-                        <ImageUpload 
-                            currentImage={typeof eventImage === 'string' ? eventImage : null} 
-                            onUpload={(data) => setEventImage(data)} 
-                        />
-                    </div>
-            <div
-                className="container"
-                style={{
-                    maxWidth: "900px",
-                    filter: !isAuthenticated ? "blur(4px)" : "none",
-                    pointerEvents: !isAuthenticated ? "none" : "auto",
-                    userSelect: !isAuthenticated ? "none" : "auto"
-                }}
-            >
-                <div className="mb-4 text-center">
                     <h2 className="fw-bold">Publicar Nuevo Evento</h2>
                     <p className="text-muted">Completa los detalles para que la comunidad descubra tu evento.</p>
                 </div>
@@ -361,172 +296,196 @@ export const CreateEvent = () => {
 
                 <form onSubmit={handleSubmit} className={`row g-4 needs-validation ${validated ? 'was-validated' : ''}`} noValidate>
 
-                    <div className="col-12 col-lg-7">
+                    <div className="col-12">
                         <div className="card border-0 shadow-sm rounded-4 p-4 h-100">
                             <h5 className="fw-bold d-flex align-items-center mb-4">
                                 <Info size={20} className="me-2 text-danger" /> Información Básica
                             </h5>
 
-                            <div className="mb-3">
-                                <label className="form-label fw-medium">Nombre del Evento <span className="text-danger">*</span></label>
-                                <input type="text" name="title" className="form-control bg-light border-0 py-2" value={formData.title} onChange={handleChange} required placeholder="Ej: Concierto Sinfónico, Torneo de Pádel..." />
-                                <div className="invalid-feedback">El nombre del evento es obligatorio.</div>
-                            </div>
-
-                    <div className="row g-4">
-                        <div className="col-12 col-md-8">
-                            <label className="form-label fw-bold">Título del evento *</label>
-                            <input type="text" className="form-control rounded-3 py-2" name="title" value={formData.title} onChange={handleChange} required />
-                        </div>
-                        <div className="col-12 col-md-4">
-                            <label className="form-label fw-bold">Categoría *</label>
-                            <select className="form-select rounded-3 py-2" name="category_id" value={formData.category_id} onChange={handleChange} required>
-                                <option value="">Seleccionar...</option>
-                                {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                            </select>
-                        </div>
-
-                        <div className="col-12">
-                            <div className="p-4 bg-light rounded-4 border">
-                                <h6 className="fw-bold mb-4 border-bottom pb-2" style={{ color: "#ff523b" }}>
-                                    <Calendar size={20} className="me-2"/> Fecha y Horario
-                                </h6>
-                                <div className="row g-4">
-                                    <div className="col-12 col-md-4">
-                                        <label className="form-label fw-bold text-secondary mb-2" style={{ fontSize: "0.85rem" }}>Fecha del evento</label>
-                                        <input 
-                                            type="date" 
-                                            className={`form-control rounded-3 py-2 shadow-sm border-0 cursor-pointer text-muted fw-medium ${dateError ? 'is-invalid' : ''}`} 
-                                            name="event_date" 
-                                            value={formData.event_date} 
-                                            onChange={handleChange} 
-                                            min={today} 
-                                            required 
-                                        />
-                                        {dateError && <div className="text-danger small fw-bold mt-2 d-flex align-items-center"><X size={14} className="me-1"/> {dateError}</div>}
-                                    </div>
-                                    
-                                    <TimeSelect label="Hora de Inicio" time={time} setTime={setTime} prefix="start" />
-                                    <TimeSelect label="Hora de Fin" time={time} setTime={setTime} prefix="end" />
-                                    
-                                    {timeError && <div className="col-12 text-danger small fw-bold mt-2 d-flex align-items-center"><X size={16} className="me-1"/> {timeError}</div>}
-                            <div className="mb-3">
-                                <label className="form-label fw-medium">Descripción del Evento <span className="text-danger">*</span></label>
-                                <textarea
-                                    name="description"
-                                    className="form-control bg-light border-0 py-2"
-                                    rows="4"
-                                    value={formData.description}
-                                    onChange={handleChange}
-                                    required
-                                    minLength="50"
-                                    placeholder="Detalla de qué trata el evento... (Mínimo 50 caracteres)"
-                                ></textarea>
-                                <div className={`mt-1 small fw-medium text-end ${formData.description.length > 0 && formData.description.length < 50 ? 'text-danger' : 'text-muted'}`}>
-                                    {formData.description.length} / 50 caracteres mínimos
+                            <div className="row g-3">
+                                <div className="col-12 col-md-8">
+                                    <label className="form-label fw-medium">Nombre del Evento <span className="text-danger">*</span></label>
+                                    <input type="text" name="title" className="form-control bg-light border-0 py-2" value={formData.title} onChange={handleChange} required placeholder="Ej: Concierto Sinfónico, Torneo de Pádel..." />
+                                    <div className="invalid-feedback">El nombre del evento es obligatorio.</div>
+                                </div>
+                                <div className="col-12 col-md-4">
+                                    <label className="form-label fw-medium">Categoría <span className="text-danger">*</span></label>
+                                    <select className="form-select bg-light border-0 py-2" name="category_id" value={formData.category_id} onChange={handleChange} required>
+                                        <option value="">Seleccionar...</option>
+                                        {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                                    </select>
+                                    <div className="invalid-feedback">Selecciona una categoría.</div>
                                 </div>
                             </div>
-                        </div>
-
-                        <div className="col-12">
-                            <div className="p-3 bg-light rounded-4 border">
-                                <div className="d-flex align-items-center justify-content-between mb-2">
-                                    <h6 className="fw-bold mb-0"><Mic size={18} className="me-2 text-primary"/> Invitados Especiales</h6>
-                                    <div className="form-check form-switch m-0">
-                                        <input className="form-check-input shadow-none cursor-pointer" type="checkbox" role="switch" checked={hasGuests} onChange={() => { setHasGuests(!hasGuests); if(hasGuests) setGuestList([]); }}/>
-                                    </div>
-                            <div className="mb-3">
-                                <label className="form-label fw-medium">Número de Contacto (Opcional)</label>
-                                <div className="input-group">
-                                    <span className="input-group-text bg-light border-0"><Phone size={18} className="text-muted" /></span>
-                                    <input type="tel" name="contact_phone" className="form-control bg-light border-0 py-2" value={formData.contact_phone} onChange={handleChange} placeholder="Ej: +58 412 123 4567" />
-                                </div>
-                                {hasGuests && (
-                                    <div className="mt-3 pt-3 border-top">
-                                        <div className="d-flex gap-2 mb-3">
-                                            <input type="text" className="form-control rounded-3 shadow-sm border-0" placeholder="Ej: DJ Sam..." value={currentGuest} onChange={(e) => setCurrentGuest(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleGuests(e, 'ADD')} />
-                                            <button type="button" className="btn btn-dark rounded-3 px-3 shadow-sm" onClick={(e) => handleGuests(e, 'ADD')} disabled={!currentGuest.trim()}><Plus size={18} /></button>
-                                        </div>
-                                        <div className="d-flex flex-wrap gap-2">
-                                            {guestList.map((g, i) => (
-                                                <span key={i} className="badge bg-white text-dark border shadow-sm px-3 py-2 rounded-pill d-flex align-items-center fw-medium">
-                                                    {g} <X size={14} className="ms-2 text-danger cursor-pointer" onClick={(e) => handleGuests(e, 'REMOVE', g)} />
-                                                </span>
-                                            ))}
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-
-                        <div className="col-12 col-md-6">
-                            <label className="form-label fw-bold"><MapPin size={18} className="me-2 text-danger"/> Lugar *</label>
-                            <input type="text" className="form-control rounded-3 py-2" name="location_name" value={formData.location_name} onChange={handleChange} required />
-                        </div>
-                        <div className="col-12 col-md-6 position-relative">
-                            <label className="form-label fw-bold"><Search size={18} className="me-2 text-danger"/> Buscar Dirección</label>
-                            <input type="text" className="form-control rounded-3 py-2" value={formData.address} onChange={handleAddressSearch} autoComplete="off"/>
-                            {showDropdown && searchResults.length > 0 && (
-                                <div className="position-absolute w-100 bg-white border rounded-3 shadow-lg" style={{ zIndex: 1000, top: "100%", maxHeight: "200px", overflowY: "auto" }}>
-                                    {searchResults.map((loc, idx) => (
-                                        <div key={idx} className="p-3 border-bottom text-truncate cursor-pointer hover-bg-light" onClick={() => {
-                                            setFormData({...formData, address: loc.display_name, latitude: parseFloat(loc.lat), longitude: parseFloat(loc.lon)});
-                                            setShowDropdown(false);
-                                        }}>
-                                            <MapPin size={14} className="text-danger me-2 d-inline" />{loc.display_name}
-                                        </div>
-                                    ))}
-                            {/* 3. CAMBIO AQUÍ: Cambiamos onImageUploaded por onImagesUploaded */}
-                            <div className="mb-0">
-                                <label className="form-label fw-medium d-flex align-items-center">
-                                    <ImagePlus size={18} className="me-2 text-danger" />
-                                    Sube las fotos del evento (Opcional)
-                                </label>
-                                <div className="bg-light p-3 rounded-3 border-0">
-                                    <ImageUpload onImagesUploaded={handleImagesUploaded} />
-                                </div>
-                            )}
-                        </div>
-                        <div className="col-12">
-                            <div className="rounded-4 overflow-hidden border shadow-sm" style={{ height: "250px", zIndex: 1 }}>
-                                <MapContainer center={formData.latitude ? [formData.latitude, formData.longitude] : [10.4806, -66.9036]} zoom={12} style={{ height: "100%", cursor: "crosshair" }}>
-                                    <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
-                                    <MapEventsListener setFormData={setFormData} />
-                                    {formData.latitude && <Marker position={[formData.latitude, formData.longitude]} icon={customMarker} />}
-                                    <MapAutoUpdater lat={formData.latitude} lng={formData.longitude} />
-                                </MapContainer>
-                            </div>
-                        </div>
-
-                        <div className="col-12 col-md-6">
-                            <label className="form-label fw-bold d-flex justify-content-between">
-                                <span><DollarSign size={18} className="me-1 text-success"/> Precio ($)</span>
-                                <div className="form-check form-switch m-0">
-                                    <input className="form-check-input cursor-pointer" type="checkbox" checked={isFreeEvent} onChange={() => { setIsFreeEvent(!isFreeEvent); if(!isFreeEvent) setFormData({...formData, price: ""}); }}/>
-                                    <label className="form-check-label small text-muted">Gratis</label>
-                                </div>
-                            </label>
-                            <input type="number" step="0.01" min="0" className={`form-control rounded-3 py-2 shadow-sm ${isFreeEvent ? 'bg-light' : ''}`} name="price" value={isFreeEvent ? "0" : formData.price} onChange={handleChange} disabled={isFreeEvent}/>
-                        </div>
-                        <div className="col-12 col-md-6">
-                            <label className="form-label fw-bold"><Users size={18} className="me-2 text-primary"/> Aforo máximo</label>
-                            <input type="number" min="1" className="form-control rounded-3 py-2 shadow-sm" name="capacity" value={formData.capacity} onChange={handleChange} />
-                        </div>
-                        <div className="col-12">
-                            <label className="form-label fw-bold"><AlignLeft size={18} className="me-2 text-secondary"/> Descripción detallada</label>
-                            <textarea className="form-control rounded-3 shadow-sm" rows="4" name="description" value={formData.description} onChange={handleChange}></textarea>
                         </div>
                     </div>
 
-                    <hr className="my-5 text-light" />
-                    <button 
-                        type="submit" 
-                        disabled={isSubmitting || timeError || dateError} 
-                        className="btn w-100 rounded-pill py-3 fw-bold text-white fs-5 shadow-sm transition-all hover-scale" 
-                        style={{ background: (timeError || dateError) ? "#ccc" : orangeGradient, border: "none" }}
-                    >
-                        {isSubmitting ? "Publicando evento..." : "Crear Evento"}
-                    </button>
+                    <div className="col-12">
+                        <div className="card border-0 shadow-sm rounded-4 p-4">
+                            <h6 className="fw-bold mb-4 border-bottom pb-2" style={{ color: "#ff523b" }}>
+                                <Calendar size={20} className="me-2"/> Fecha y Horario
+                            </h6>
+                            <div className="row g-4">
+                                <div className="col-12 col-md-4">
+                                    <label className="form-label fw-bold text-secondary mb-2" style={{ fontSize: "0.85rem" }}>Fecha del evento</label>
+                                    <input 
+                                        type="date" 
+                                        className={`form-control rounded-3 py-2 shadow-sm border-0 cursor-pointer text-muted fw-medium ${dateError ? 'is-invalid' : ''}`} 
+                                        name="event_date" 
+                                        value={formData.event_date} 
+                                        onChange={handleChange} 
+                                        min={today} 
+                                        required 
+                                    />
+                                    {dateError && <div className="text-danger small fw-bold mt-2 d-flex align-items-center"><X size={14} className="me-1"/> {dateError}</div>}
+                                </div>
+                                
+                                <TimeSelect label="Hora de Inicio" time={time} setTime={setTime} prefix="start" />
+                                <TimeSelect label="Hora de Fin" time={time} setTime={setTime} prefix="end" />
+                                
+                                {timeError && <div className="col-12 text-danger small fw-bold mt-2 d-flex align-items-center"><X size={16} className="me-1"/> {timeError}</div>}
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="col-12">
+                        <div className="card border-0 shadow-sm rounded-4 p-4">
+                            <h5 className="fw-bold d-flex align-items-center mb-4">
+                                <MapPin size={20} className="me-2 text-danger" /> Ubicación
+                            </h5>
+                            <div className="row g-3">
+                                <div className="col-12 col-md-6">
+                                    <label className="form-label fw-medium">Nombre del Lugar <span className="text-danger">*</span></label>
+                                    <input type="text" className="form-control bg-light border-0 py-2" name="location_name" value={formData.location_name} onChange={handleChange} required placeholder="Ej: Teatro Municipal" />
+                                </div>
+                                <div className="col-12 col-md-6 position-relative">
+                                    <label className="form-label fw-medium">Buscar Dirección</label>
+                                    <input type="text" className="form-control bg-light border-0 py-2" value={formData.address} onChange={handleAddressSearch} autoComplete="off" placeholder="Escribe para buscar..." />
+                                    {showDropdown && searchResults.length > 0 && (
+                                        <div className="position-absolute w-100 bg-white border rounded-3 shadow-lg" style={{ zIndex: 1000, top: "100%", maxHeight: "200px", overflowY: "auto" }}>
+                                            {searchResults.map((loc, idx) => (
+                                                <div key={idx} className="p-3 border-bottom text-truncate cursor-pointer hover-bg-light" onClick={() => {
+                                                    setFormData({...formData, address: loc.display_name, latitude: parseFloat(loc.lat), longitude: parseFloat(loc.lon)});
+                                                    setShowDropdown(false);
+                                                }}>
+                                                    <MapPin size={14} className="text-danger me-2 d-inline" />{loc.display_name}
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                                <div className="col-12 mt-3">
+                                    <div className="rounded-4 overflow-hidden border shadow-sm" style={{ height: "250px", zIndex: 1 }}>
+                                        <MapContainer center={formData.latitude ? [formData.latitude, formData.longitude] : [10.4806, -66.9036]} zoom={12} style={{ height: "100%", cursor: "crosshair" }}>
+                                            <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+                                            <MapEventsListener setFormData={setFormData} />
+                                            {formData.latitude && <Marker position={[formData.latitude, formData.longitude]} icon={customMarker} />}
+                                            <MapAutoUpdater lat={formData.latitude} lng={formData.longitude} />
+                                        </MapContainer>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="col-12">
+                        <div className="card border-0 shadow-sm rounded-4 p-4">
+                            <h5 className="fw-bold d-flex align-items-center mb-4">
+                                <DollarSign size={20} className="me-2 text-danger" /> Detalles y Costos
+                            </h5>
+                            <div className="row g-3">
+                                <div className="col-12 col-md-6">
+                                    <div className="d-flex justify-content-between align-items-center mb-2">
+                                        <label className="form-label fw-medium mb-0">Precio ($)</label>
+                                        <div className="form-check form-switch m-0">
+                                            <input className="form-check-input cursor-pointer" type="checkbox" checked={isFreeEvent} onChange={() => { setIsFreeEvent(!isFreeEvent); if(!isFreeEvent) setFormData({...formData, price: ""}); }}/>
+                                            <label className="form-check-label small text-muted">Gratis</label>
+                                        </div>
+                                    </div>
+                                    <input type="number" step="0.01" min="0" className={`form-control bg-light border-0 py-2 ${isFreeEvent ? 'text-muted' : ''}`} name="price" value={isFreeEvent ? "0" : formData.price} onChange={handleChange} disabled={isFreeEvent} placeholder="0.00" />
+                                </div>
+                                <div className="col-12 col-md-6">
+                                    <label className="form-label fw-medium">Aforo máximo</label>
+                                    <input type="number" min="1" className="form-control bg-light border-0 py-2" name="capacity" value={formData.capacity} onChange={handleChange} placeholder="Ej: 100" />
+                                </div>
+                                <div className="col-12">
+                                    <label className="form-label fw-medium">Número de Contacto (Opcional)</label>
+                                    <div className="input-group">
+                                        <span className="input-group-text bg-light border-0"><Phone size={18} className="text-muted" /></span>
+                                        <input type="tel" name="contact_phone" className="form-control bg-light border-0 py-2" value={formData.contact_phone} onChange={handleChange} placeholder="Ej: +58 412 123 4567" />
+                                    </div>
+                                </div>
+                                <div className="col-12">
+                                    <label className="form-label fw-medium">Descripción del Evento <span className="text-danger">*</span></label>
+                                    <textarea
+                                        name="description"
+                                        className="form-control bg-light border-0 py-2"
+                                        rows="4"
+                                        value={formData.description}
+                                        onChange={handleChange}
+                                        required
+                                        minLength="50"
+                                        placeholder="Detalla de qué trata el evento... (Mínimo 50 caracteres)"
+                                    ></textarea>
+                                    <div className={`mt-1 small fw-medium text-end ${formData.description.length > 0 && formData.description.length < 50 ? 'text-danger' : 'text-muted'}`}>
+                                        {formData.description.length} / 50 caracteres mínimos
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="col-12">
+                        <div className="card border-0 shadow-sm rounded-4 p-4">
+                            <h5 className="fw-bold d-flex align-items-center mb-3">
+                                <Mic size={20} className="me-2 text-danger" /> Invitados Especiales
+                            </h5>
+                            <div className="d-flex align-items-center justify-content-between mb-3">
+                                <span className="text-muted small">¿El evento cuenta con artistas o invitados especiales?</span>
+                                <div className="form-check form-switch m-0">
+                                    <input className="form-check-input shadow-none cursor-pointer" type="checkbox" role="switch" checked={hasGuests} onChange={() => { setHasGuests(!hasGuests); if(hasGuests) setGuestList([]); }}/>
+                                </div>
+                            </div>
+                            {hasGuests && (
+                                <div className="mt-3 pt-3 border-top">
+                                    <div className="d-flex gap-2 mb-3">
+                                        <input type="text" className="form-control bg-light border-0 shadow-sm" placeholder="Ej: DJ Sam..." value={currentGuest} onChange={(e) => setCurrentGuest(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleGuests(e, 'ADD')} />
+                                        <button type="button" className="btn btn-dark rounded-3 px-3 shadow-sm" onClick={(e) => handleGuests(e, 'ADD')} disabled={!currentGuest.trim()}><Plus size={18} /></button>
+                                    </div>
+                                    <div className="d-flex flex-wrap gap-2">
+                                        {guestList.map((g, i) => (
+                                            <span key={i} className="badge bg-white text-dark border shadow-sm px-3 py-2 rounded-pill d-flex align-items-center fw-medium">
+                                                {g} <X size={14} className="ms-2 text-danger cursor-pointer" onClick={(e) => handleGuests(e, 'REMOVE', g)} />
+                                            </span>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+
+                    <div className="col-12">
+                        <div className="card border-0 shadow-sm rounded-4 p-4">
+                            <label className="form-label fw-medium d-flex align-items-center mb-3">
+                                <ImagePlus size={20} className="me-2 text-danger" />
+                                Sube las fotos del evento (Opcional)
+                            </label>
+                            <div className="bg-light p-3 rounded-3 border-0">
+                                <ImageUpload onImagesUploaded={handleImagesUploaded} />
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="col-12">
+                        <button 
+                            type="submit" 
+                            disabled={isSubmitting || timeError || dateError} 
+                            className="btn w-100 rounded-pill py-3 fw-bold text-white fs-5 shadow-sm transition-all hover-scale" 
+                            style={{ background: (timeError || dateError) ? "#ccc" : orangeGradient, border: "none" }}
+                        >
+                            {isSubmitting ? "Publicando evento..." : "Crear Evento"}
+                        </button>
+                    </div>
                 </form>
             </div>
             

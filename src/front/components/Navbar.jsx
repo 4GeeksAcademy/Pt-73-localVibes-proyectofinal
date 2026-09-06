@@ -70,26 +70,6 @@ export const Navbar = () => {
             }}
         >
             <div className="container px-4 h-100 position-relative d-flex align-items-center justify-content-between">
-            {/* ENLACES CENTRALES */}
-            <div className="navbar-links">
-                <Link to="/" className={`nav-item ${location.pathname === '/' ? 'active' : ''}`}>
-                    <span className="nav-text">Inicio</span>
-                    {location.pathname === '/' && <div className="active-line"></div>}
-                </Link>
-                <Link to="/explorar" className={`nav-item ${location.pathname === '/explorar' ? 'active' : ''}`}>
-                    <span className="nav-text">Explorar</span>
-                    {location.pathname === '/explorar' && <div className="active-line"></div>}
-                </Link>
-                <Link to="/map" className="nav-item" style={{ textDecoration: 'none' }}>
-                    <span className="nav-text">Mapa</span>
-                    <span className="badge badge-orange">Interactivo</span>
-                </Link>
-                
-                {/* FAVORITOS CONTEO SINCRONIZADO */}
-                <Link to="/profile?tab=favoritos" className="nav-item" style={{ textDecoration: 'none' }}>
-                    <span className="nav-text">Favoritos</span>
-                    <span className="badge badge-pink">{favoritesCount}</span>
-                </Link>
                 
                 {/* LOGO (Izquierda) */}
                 <Link to="/" className="navbar-brand d-flex align-items-center me-0 h-100">
@@ -114,7 +94,6 @@ export const Navbar = () => {
                     
                     {/* ENLACES CENTRALES (Perfectamente centrados en pantalla) */}
                     <ul className="navbar-nav navbar-center-links h-100 align-items-center gap-2 gap-lg-4 text-center mt-3 mt-lg-0 bg-white">
-                        
                         <li className="nav-item h-100 d-flex align-items-center">
                             <Link to="/" className={`nav-link custom-nav-link ${isActive('/') ? 'active' : ''}`}>
                                 Inicio
@@ -156,14 +135,12 @@ export const Navbar = () => {
                                 className="d-flex align-items-center gap-2 p-1 pe-4 rounded-pill text-decoration-none transition-transform hover-scale bg-white"
                                 style={{ border: "1px solid #e2e8f0", boxShadow: "0 2px 10px rgba(0,0,0,0.02)" }}
                             >
-                                {/* 🌟 AVATAR CON EFECTO GLOW PREMIUM 🌟 */}
                                 <img
                                     src={user.avatar || `https://ui-avatars.com/api/?name=${user.name}&background=random`}
                                     alt={user.name}
                                     className="rounded-circle object-fit-cover avatar-glow bg-white"
                                     style={{ width: "40px", height: "40px" }}
                                 />
-                                {/* NOMBRE COMPLETO */}
                                 <span className="fw-bold text-dark fs-6 text-truncate" style={{ maxWidth: "160px" }}>
                                     {user.name} {user.lastname}
                                 </span>
@@ -184,7 +161,6 @@ export const Navbar = () => {
             <style>{`
                 body { padding-top: 80px; } 
 
-                /* Centrado perfecto y absoluto de los botones solo en pantallas grandes */
                 @media (min-width: 992px) {
                     .navbar-center-links {
                         position: absolute !important;
@@ -193,10 +169,9 @@ export const Navbar = () => {
                     }
                 }
 
-                /* Efecto Glow (Brillo) del Avatar estilo Premium */
                 .avatar-glow {
                     border: 2px solid ${brandColor};
-                    padding: 2px; /* Espacio blanco entre la foto y el borde */
+                    padding: 2px;
                     box-shadow: 0px 0px 10px rgba(255, 82, 59, 0.4);
                     transition: box-shadow 0.3s ease, transform 0.3s ease;
                 }
@@ -205,7 +180,6 @@ export const Navbar = () => {
                     box-shadow: 0px 0px 15px rgba(255, 82, 59, 0.7);
                 }
 
-                /* Estilo de los Enlaces (Animación) */
                 .custom-nav-link {
                     position: relative;
                     color: #64748b !important;

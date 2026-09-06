@@ -158,13 +158,22 @@ class Ticket(db.Model):
     
     # Esto generará un código único tipo "LV-A1B2C3" automáticamente
     reference: Mapped[str] = mapped_column(String(50), default=lambda: f"LV-{uuid.uuid4().hex[:6].upper()}")
-    purchased_at: Mapped[DateTime] = mapped_column(DateTime, default=datetime.utcnow)
+    purchased_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     ticket_type: Mapped[str] = mapped_column(String(50), default="General")
 
     # Relaciones
     user: Mapped["User"] = relationship("User", backref="tickets")
     event: Mapped["Event"] = relationship("Event", backref="tickets")
-            "created_at": self.created_at.isoformat() if self.created_at else None
+
+    def serialize(self):
+        return {
+            "id": self.id,
+            "user_id": self.user_id,
+            "event_id": self.event_id,
+            "reference": self.reference,
+            "purchased_at": self.purchased_at.isoformat() if self.purchased_at else None,
+            "ticket_type": self.ticket_type,
+            "event": self.event.serialize() if self.event else None
         }
 
 # -------------------------------------------------------------
@@ -184,13 +193,7 @@ class UserMedia(db.Model):
     def serialize(self):
         return {
             "id": self.id,
-            "reference": self.reference,
-            "purchased_at": self.purchased_at,
-            "ticket_type": self.ticket_type,
-            "event": self.event.serialize() if self.event else None
-        }
-    
             "image_url": self.image_url,
             "user_id": self.user_id,
-            "created_at": self.created_at.isoformat()
+            "created_at": self.created_at.isoformat() if self.created_at else None
         }
