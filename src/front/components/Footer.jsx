@@ -41,6 +41,7 @@ export const Footer = () => {
                     <div className="col-6 col-lg-2">
                         <h6 className="fw-bold mb-3 text-dark">Conecta</h6>
                         <ul className="list-unstyled d-flex flex-column gap-2 small">
+                            <li><Link to="/" className="text-muted text-decoration-none">Inicio</Link></li>
                             <li><Link to="/mapa" className="text-muted text-decoration-none">Mapa Interactivo</Link></li>
                             <li><Link to="/profile" className="text-muted text-decoration-none">Mi Perfil</Link></li>
                             <li><Link to="/profile?tab=entradas" className="text-muted text-decoration-none">Mis Entradas</Link></li>
