@@ -1,8 +1,8 @@
 """empty message
 
-Revision ID: 833366c7a278
+Revision ID: d2ec7e066941
 Revises: 
-Create Date: 2026-09-07 04:13:42.247427
+Create Date: 2026-09-08 13:56:27.401128
 
 """
 from alembic import op
@@ -10,7 +10,7 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision = '833366c7a278'
+revision = 'd2ec7e066941'
 down_revision = None
 branch_labels = None
 depends_on = None
@@ -37,6 +37,8 @@ def upgrade():
     sa.Column('role', sa.String(length=50), nullable=True),
     sa.Column('is_active', sa.Boolean(), nullable=False),
     sa.Column('email_verify', sa.Boolean(), nullable=False),
+    sa.Column('verification_code', sa.String(length=6), nullable=True),
+    sa.Column('verification_code_expires_at', sa.DateTime(), nullable=True),
     sa.Column('created_at', sa.DateTime(), nullable=False),
     sa.PrimaryKeyConstraint('id'),
     sa.UniqueConstraint('email'),
@@ -44,7 +46,6 @@ def upgrade():
     )
     op.create_table('events',
     sa.Column('id', sa.Integer(), nullable=False),
-    sa.Column('organizer_id', sa.Integer(), nullable=False),
     sa.Column('title', sa.String(length=150), nullable=False),
     sa.Column('description', sa.Text(), nullable=True),
     sa.Column('location_name', sa.String(length=150), nullable=True),
@@ -59,6 +60,7 @@ def upgrade():
     sa.Column('capacity', sa.Integer(), nullable=True),
     sa.Column('imgs_event', sa.JSON(), nullable=True),
     sa.Column('guests', sa.JSON(), nullable=True),
+    sa.Column('organizer_id', sa.Integer(), nullable=False),
     sa.Column('category_id', sa.Integer(), nullable=False),
     sa.Column('created_at', sa.DateTime(), nullable=False),
     sa.ForeignKeyConstraint(['category_id'], ['categories.id'], ),

@@ -1,7 +1,8 @@
 import React, { useState } from "react";
 import { ImageUpload } from "../ImageUpload";
 
-export const TabSettings = ({ user }) => {
+// 👇 1. Agregamos setUser a los props recibidos 👇
+export const TabSettings = ({ user, setUser }) => {
     const orangeGradient = "linear-gradient(135deg, #c23b00 0%, #ff7a00 100%)";
     
     const [formData, setFormData] = useState({
@@ -29,7 +30,6 @@ export const TabSettings = ({ user }) => {
         const backendUrl = import.meta.env.VITE_BACKEND_URL;
 
         try {
-            // Llamado real a la API para actualizar el perfil
             const response = await fetch(`${backendUrl}/api/profile`, {
                 method: "PUT",
                 headers: {
@@ -39,17 +39,24 @@ export const TabSettings = ({ user }) => {
                 body: JSON.stringify({
                     name: formData.name,
                     lastname: formData.lastname,
-                    avatar: formData.avatar
+                    image_url: formData.avatar // 👇 2. Corregido: El backend espera "image_url"
                 })
             });
 
+            // Extraemos la respuesta (que ahora trae el usuario actualizado desde el backend)
+            const data = await response.json(); 
+
             if (response.ok) {
                 setSaved(true);
-                // Si tienes un contexto global (Context/Flux), deberías actualizar los datos del usuario aquí.
+                
+                // 👇 3. ¡LA MAGIA! Actualizamos el componente Padre al instante 👇
+                if (setUser) {
+                    setUser(data.user);
+                }
+                
                 setTimeout(() => setSaved(false), 3000);
             } else {
-                const errorData = await response.json();
-                alert(errorData.message || "No se pudo actualizar el perfil.");
+                alert(data.message || "No se pudo actualizar el perfil.");
             }
         } catch (error) {
             console.error("Error al actualizar:", error);

@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useNavigate, Link } from "react-router-dom";
-import { Calendar, MapPin, AlignLeft, DollarSign, Users, Search, Clock, X, Lock } from "lucide-react";
+import { Calendar, MapPin, AlignLeft, DollarSign, Users, Search, Clock, X, Lock, Info, Phone, ImagePlus, Plus, Mic } from "lucide-react";
 
 import { MapContainer, TileLayer, Marker, useMapEvents, useMap } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 import L from "leaflet";
+import { ImageUpload } from "../components/ImageUpload";
 
 // =========================================================
 // MINI COMPONENTES
@@ -21,7 +22,6 @@ const MapAutoUpdater = ({ lat, lng }) => {
     return null;
 };
 
-// Selector de Tiempo Premium (Estilo Píldora Minimalista SIN flechas)
 const TimeSelect = ({ label, time, setTime, prefix }) => {
     const hours = ['12','01','02','03','04','05','06','07','08','09','10','11'];
     const minutes = ['00','15','30','45'];
@@ -32,7 +32,6 @@ const TimeSelect = ({ label, time, setTime, prefix }) => {
                 <Clock size={14} className="me-1"/> {label}
             </label>
             <div className="d-flex align-items-center justify-content-start gap-2 bg-white p-2 rounded-pill border shadow-sm" style={{ width: "fit-content" }}>
-                
                 <select 
                     className="form-control custom-time-select bg-light text-center fw-bold border-0 rounded-pill px-0 py-1 shadow-none" 
                     value={time[`${prefix}H`]} 
@@ -41,9 +40,7 @@ const TimeSelect = ({ label, time, setTime, prefix }) => {
                 >
                     {hours.map(h => <option key={h} value={h}>{h}</option>)}
                 </select>
-                
                 <span className="fw-bold text-muted" style={{ fontSize: "1.1rem", paddingBottom: "2px" }}>:</span>
-                
                 <select 
                     className="form-control custom-time-select bg-light text-center fw-bold border-0 rounded-pill px-0 py-1 shadow-none" 
                     value={time[`${prefix}M`]} 
@@ -52,7 +49,6 @@ const TimeSelect = ({ label, time, setTime, prefix }) => {
                 >
                     {minutes.map(m => <option key={m} value={m}>{m}</option>)}
                 </select>
-                
                 <select 
                     className="form-control custom-time-select text-center fw-bold border-0 rounded-pill px-0 py-1 shadow-none" 
                     value={time[`${prefix}A`]} 
@@ -81,36 +77,25 @@ export const CreateEvent = () => {
     const orangeGradient = "linear-gradient(135deg, #c23b00 0%, #ff7a00 100%)";
     const today = new Date().toISOString().split("T")[0]; 
 
-    // Estados Generales
     const [isLoggedIn, setIsLoggedIn] = useState(true);
     const [categories, setCategories] = useState([]);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [error, setError] = useState("");
     const [validated, setValidated] = useState(false);
     
-    // Estados de Validación
     const [timeError, setTimeError] = useState("");
     const [dateError, setDateError] = useState("");
-
-    // Estado único para la imagen del evento
     const [eventImage, setEventImage] = useState(null); 
 
-    // Formulario Principal unificado
+    // Estados para Invitados Especiales
+    const [hasGuests, setHasGuests] = useState(false);
+    const [currentGuest, setCurrentGuest] = useState("");
+    const [guestList, setGuestList] = useState([]);
+
     const [formData, setFormData] = useState({
-        title: "",
-        category_id: "",
-        start_time: "",
-        end_time: "",
-        description: "",
-        image_url: "",
-        location_name: "",
-        address: "",
-        event_date: "",
-        latitude: null,
-        longitude: null,
-        contact_phone: "",
-        price: "",
-        capacity: ""
+        title: "", category_id: "", start_time: "", end_time: "", description: "", 
+        image_url: "", location_name: "", address: "", event_date: "", latitude: null, 
+        longitude: null, contact_phone: "", price: "", capacity: ""
     });
 
     const [time, setTime] = useState({
@@ -119,7 +104,6 @@ export const CreateEvent = () => {
     });
 
     const [isFreeEvent, setIsFreeEvent] = useState(false);
-    
     const [searchResults, setSearchResults] = useState([]);
     const [showDropdown, setShowDropdown] = useState(false);
     const searchTimeoutRef = useRef(null);
@@ -174,9 +158,13 @@ export const CreateEvent = () => {
         return `${hrs.toString().padStart(2, '0')}:${m}`;
     };
 
-    const handleImagesUploaded = (urls) => {
-        if (urls && urls.length > 0) {
-            setFormData(prev => ({ ...prev, image_url: urls[0] }));
+    const handleGuests = (e, action, guestToRemove = null) => {
+        e.preventDefault();
+        if (action === 'ADD' && currentGuest.trim()) {
+            setGuestList([...guestList, currentGuest.trim()]);
+            setCurrentGuest("");
+        } else if (action === 'REMOVE') {
+            setGuestList(guestList.filter(g => g !== guestToRemove));
         }
     };
 
@@ -211,7 +199,6 @@ export const CreateEvent = () => {
         try {
             let uploadedImagesUrls = [];
             
-            // LÓGICA DE SUBIDA INTELIGENTE 
             if (eventImage) {
                 if (typeof eventImage === "string") {
                     uploadedImagesUrls.push(eventImage);
@@ -242,7 +229,8 @@ export const CreateEvent = () => {
                 capacity: parseInt(formData.capacity) || null,
                 latitude: formData.latitude ? parseFloat(formData.latitude) : null,
                 longitude: formData.longitude ? parseFloat(formData.longitude) : null,
-                imgs_event: uploadedImagesUrls
+                imgs_event: uploadedImagesUrls,
+                guests: guestList // Agregando la lista de invitados
             };
 
             const response = await fetch(`${backendUrl}/api/events`, {
@@ -286,28 +274,26 @@ export const CreateEvent = () => {
 
                 {error && <div className="alert alert-danger rounded-4 shadow-sm border-0">{error}</div>}
 
-                <form onSubmit={handleSubmit} className="bg-white p-4 p-md-5 rounded-4 shadow-sm border-0">
+                <form onSubmit={handleSubmit} className={`bg-white p-4 p-md-5 rounded-4 shadow-sm border-0 row g-4 needs-validation ${validated ? 'was-validated' : ''}`} noValidate>
                     
-                    {/* COMPONENTE DE IMAGEN DE TU COMPAÑERO */}
-                    <div className="mb-4">
-                        <label className="form-label fw-bold">Imagen del evento (Flyer)</label>
-                        <ImageUpload 
-                            onImagesUploaded={(urls) => setEventImage(urls[0])} 
-                        />
+                    <div className="col-12">
+                        <div className="card border-0 bg-light p-4 rounded-4 shadow-sm">
+                            <label className="form-label fw-bold d-flex align-items-center mb-3">
+                                <ImagePlus size={20} className="me-2 text-danger" /> Imagen principal / Flyer
+                            </label>
+                            <ImageUpload onImagesUploaded={(urls) => setEventImage(urls)} />
+                        </div>
                     </div>
-
-                <form onSubmit={handleSubmit} className={`row g-4 needs-validation ${validated ? 'was-validated' : ''}`} noValidate>
 
                     <div className="col-12">
                         <div className="card border-0 shadow-sm rounded-4 p-4 h-100">
                             <h5 className="fw-bold d-flex align-items-center mb-4">
                                 <Info size={20} className="me-2 text-danger" /> Información Básica
                             </h5>
-
                             <div className="row g-3">
                                 <div className="col-12 col-md-8">
                                     <label className="form-label fw-medium">Nombre del Evento <span className="text-danger">*</span></label>
-                                    <input type="text" name="title" className="form-control bg-light border-0 py-2" value={formData.title} onChange={handleChange} required placeholder="Ej: Concierto Sinfónico, Torneo de Pádel..." />
+                                    <input type="text" name="title" className="form-control bg-light border-0 py-2" value={formData.title} onChange={handleChange} required placeholder="Ej: Concierto Sinfónico..." />
                                     <div className="invalid-feedback">El nombre del evento es obligatorio.</div>
                                 </div>
                                 <div className="col-12 col-md-4">
@@ -350,38 +336,70 @@ export const CreateEvent = () => {
                         </div>
                     </div>
 
-                        <div className="col-12 col-md-6">
-                            <label className="form-label fw-bold"><MapPin size={18} className="me-2 text-danger"/> Lugar *</label>
-                            <input type="text" className="form-control rounded-3 py-2" name="location_name" value={formData.location_name} onChange={handleChange} required />
-                        </div>
-                        <div className="col-12 col-md-6 position-relative">
-                            <label className="form-label fw-bold"><Search size={18} className="me-2 text-danger"/> Buscar Dirección</label>
-                            <input type="text" className="form-control rounded-3 py-2" value={formData.address} onChange={handleAddressSearch} autoComplete="off"/>
-                            {showDropdown && searchResults.length > 0 && (
-                                <div className="position-absolute w-100 bg-white border rounded-3 shadow-lg" style={{ zIndex: 1000, top: "100%", maxHeight: "200px", overflowY: "auto" }}>
-                                    {searchResults.map((loc, idx) => (
-                                        <div key={idx} className="p-3 border-bottom text-truncate cursor-pointer hover-bg-light" onClick={() => {
-                                            setFormData({...formData, address: loc.display_name, latitude: parseFloat(loc.lat), longitude: parseFloat(loc.lon)});
-                                            setShowDropdown(false);
-                                        }}>
-                                            <MapPin size={14} className="text-danger me-2 d-inline" />{loc.display_name}
+                    <div className="col-12">
+                        <div className="card border-0 shadow-sm rounded-4 p-4">
+                            <h6 className="fw-bold mb-4 border-bottom pb-2" style={{ color: "#ff523b" }}>
+                                <MapPin size={20} className="me-2"/> Ubicación
+                            </h6>
+                            <div className="row g-4">
+                                <div className="col-12 col-md-6">
+                                    <label className="form-label fw-medium">Nombre del Lugar <span className="text-danger">*</span></label>
+                                    <input type="text" className="form-control bg-light border-0 py-2" name="location_name" value={formData.location_name} onChange={handleChange} required placeholder="Ej: Teatro Teresa Carreño" />
+                                </div>
+                                <div className="col-12 col-md-6 position-relative">
+                                    <label className="form-label fw-medium"><Search size={16} className="me-1 text-danger"/> Buscar en Mapa</label>
+                                    <input type="text" className="form-control bg-light border-0 py-2" value={formData.address} onChange={handleAddressSearch} autoComplete="off" placeholder="Escribe para buscar..."/>
+                                    {showDropdown && searchResults.length > 0 && (
+                                        <div className="position-absolute w-100 bg-white border rounded-3 shadow-lg" style={{ zIndex: 1000, top: "100%", maxHeight: "200px", overflowY: "auto" }}>
+                                            {searchResults.map((loc, idx) => (
+                                                <div key={idx} className="p-3 border-bottom text-truncate cursor-pointer hover-bg-light" onClick={() => {
+                                                    setFormData({...formData, address: loc.display_name, latitude: parseFloat(loc.lat), longitude: parseFloat(loc.lon)});
+                                                    setShowDropdown(false);
+                                                }}>
+                                                    <MapPin size={14} className="text-danger me-2 d-inline" />{loc.display_name}
+                                                </div>
+                                            ))}
                                         </div>
+                                    )}
+                                </div>
+                                <div className="col-12">
+                                    <div className="rounded-4 overflow-hidden border shadow-sm" style={{ height: "250px", zIndex: 1 }}>
+                                        <MapContainer center={formData.latitude ? [formData.latitude, formData.longitude] : [10.4806, -66.9036]} zoom={12} style={{ height: "100%", cursor: "crosshair" }}>
+                                            <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+                                            <MapEventsListener setFormData={setFormData} />
+                                            {formData.latitude && <Marker position={[formData.latitude, formData.longitude]} icon={customMarker} />}
+                                            <MapAutoUpdater lat={formData.latitude} lng={formData.longitude} />
+                                        </MapContainer>
                                     </div>
+                                    <small className="text-muted mt-2 d-block">Haz clic en el mapa para ajustar la ubicación exacta de tu evento.</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="col-12">
+                        <div className="card border-0 shadow-sm rounded-4 p-4">
+                            <div className="row g-4">
+                                <div className="col-12 col-md-4">
+                                    <label className="form-label fw-medium d-flex justify-content-between">
+                                        <span><DollarSign size={18} className="me-1 text-success"/> Precio ($)</span>
+                                        <div className="form-check form-switch m-0">
+                                            <input className="form-check-input cursor-pointer shadow-none" type="checkbox" checked={isFreeEvent} onChange={() => { setIsFreeEvent(!isFreeEvent); if(!isFreeEvent) setFormData({...formData, price: ""}); }}/>
+                                            <label className="form-check-label small text-muted">Gratis</label>
+                                        </div>
+                                    </label>
                                     <input type="number" step="0.01" min="0" className={`form-control bg-light border-0 py-2 ${isFreeEvent ? 'text-muted' : ''}`} name="price" value={isFreeEvent ? "0" : formData.price} onChange={handleChange} disabled={isFreeEvent} placeholder="0.00" />
                                 </div>
-                                <div className="col-12 col-md-6">
-                                    <label className="form-label fw-medium">Aforo máximo</label>
+                                <div className="col-12 col-md-4">
+                                    <label className="form-label fw-medium"><Users size={18} className="me-1 text-primary"/> Aforo máximo</label>
                                     <input type="number" min="1" className="form-control bg-light border-0 py-2" name="capacity" value={formData.capacity} onChange={handleChange} placeholder="Ej: 100" />
                                 </div>
-                                <div className="col-12">
-                                    <label className="form-label fw-medium">Número de Contacto (Opcional)</label>
-                                    <div className="input-group">
-                                        <span className="input-group-text bg-light border-0"><Phone size={18} className="text-muted" /></span>
-                                        <input type="tel" name="contact_phone" className="form-control bg-light border-0 py-2" value={formData.contact_phone} onChange={handleChange} placeholder="Ej: +58 412 123 4567" />
-                                    </div>
+                                <div className="col-12 col-md-4">
+                                    <label className="form-label fw-medium"><Phone size={18} className="me-1 text-secondary"/> Contacto</label>
+                                    <input type="tel" name="contact_phone" className="form-control bg-light border-0 py-2" value={formData.contact_phone} onChange={handleChange} placeholder="Ej: +58 412 123 4567" />
                                 </div>
                                 <div className="col-12">
-                                    <label className="form-label fw-medium">Descripción del Evento <span className="text-danger">*</span></label>
+                                    <label className="form-label fw-medium"><AlignLeft size={18} className="me-1 text-secondary"/> Descripción del Evento <span className="text-danger">*</span></label>
                                     <textarea
                                         name="description"
                                         className="form-control bg-light border-0 py-2"
@@ -426,18 +444,6 @@ export const CreateEvent = () => {
                                     </div>
                                 </div>
                             )}
-                        </div>
-                    </div>
-
-                    <div className="col-12">
-                        <div className="card border-0 shadow-sm rounded-4 p-4">
-                            <label className="form-label fw-medium d-flex align-items-center mb-3">
-                                <ImagePlus size={20} className="me-2 text-danger" />
-                                Sube las fotos del evento (Opcional)
-                            </label>
-                            <div className="bg-light p-3 rounded-3 border-0">
-                                <ImageUpload onImagesUploaded={handleImagesUploaded} />
-                            </div>
                         </div>
                     </div>
 
