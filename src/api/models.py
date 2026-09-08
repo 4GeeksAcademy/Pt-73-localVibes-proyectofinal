@@ -1,9 +1,9 @@
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-from sqlalchemy import String, Integer, DateTime, Boolean, Text, Float, ForeignKey, JSON, Float
+from sqlalchemy import String, Integer, DateTime, Boolean, Text, Float, ForeignKey, JSON
 from datetime import datetime
 from typing import Optional, List
-import uuid #
+import uuid 
 
 db = SQLAlchemy()
 
@@ -73,13 +73,12 @@ class Category(db.Model):
 
 
 # -------------------------------------------------------------
-# 3. TABLA EVENT (Esta es la que usa tu semilla)
+# 3. TABLA EVENT 
 # -------------------------------------------------------------
 class Event(db.Model):
     __tablename__ = 'events'
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    organizer_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
     title: Mapped[str] = mapped_column(String(150), nullable=False)
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     location_name: Mapped[Optional[str]] = mapped_column(String(150), nullable=True)
@@ -92,8 +91,8 @@ class Event(db.Model):
     status: Mapped[str] = mapped_column(String(50), default="active", nullable=False)
     price: Mapped[float] = mapped_column(Float, nullable=True, default=0.0)
     capacity: Mapped[int] = mapped_column(Integer, nullable=True) 
-    imgs_event: Mapped[list] = mapped_column(JSON, nullable=True)
-    guests: Mapped[list] = mapped_column(JSON, nullable=True) 
+    imgs_event: Mapped[Optional[list]] = mapped_column(JSON, nullable=True)
+    guests = db.Column(db.JSON, nullable=True) 
     
     # Claves Foráneas
     organizer_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
@@ -106,6 +105,15 @@ class Event(db.Model):
     favorite_events: Mapped[List["FavoriteEvent"]] = relationship(back_populates="event")
 
     def serialize(self):
+        # 👇 LÓGICA AGREGADA PARA EXTRAER LOS DATOS DEL ORGANIZADOR 👇
+        organizer_data = None
+        if self.organizer:
+            organizer_data = {
+                "id": self.organizer.id,
+                "name": self.organizer.name,
+                "lastname": self.organizer.lastname
+            }
+
         return {
             "id": self.id,
             "title": self.title,
@@ -122,10 +130,11 @@ class Event(db.Model):
             "image_url": self.image_url,
             "status": self.status,
             "organizer_id": self.organizer_id,
+            "organizer": organizer_data, # 👈 AQUÍ ENVIAMOS EL DICCIONARIO A REACT
             "category_id": self.category_id,
-            "guests": self.guests
+            "guests": self.guests if self.guests else [], 
         }
-
+    
 
 # -------------------------------------------------------------
 # 4. TABLA FAVORITE_EVENTS
@@ -151,6 +160,9 @@ class FavoriteEvent(db.Model):
             "event": self.event.serialize() if self.event else None
         }
 
+# -------------------------------------------------------------
+# 5. TABLA TICKETS
+# -------------------------------------------------------------
 class Ticket(db.Model):
     __tablename__ = 'tickets'
 
@@ -158,7 +170,6 @@ class Ticket(db.Model):
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
     event_id: Mapped[int] = mapped_column(ForeignKey("events.id"), nullable=False)
     
-    # Esto generará un código único tipo "LV-A1B2C3" automáticamente
     reference: Mapped[str] = mapped_column(String(50), default=lambda: f"LV-{uuid.uuid4().hex[:6].upper()}")
     purchased_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     ticket_type: Mapped[str] = mapped_column(String(50), default="General")

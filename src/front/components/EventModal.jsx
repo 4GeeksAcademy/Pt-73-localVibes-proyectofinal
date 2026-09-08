@@ -1,37 +1,49 @@
 import React, { useState, useEffect } from "react";
-import { ArrowLeft, Share2, Heart, MapPin, CalendarDays, Ticket, ExternalLink, ChevronLeft, ChevronRight, Mic } from "lucide-react";
+import { ArrowLeft, Share2, Heart, MapPin, CalendarDays, Ticket, ExternalLink, ChevronLeft, ChevronRight, Mic, CheckCircle } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 
 export const EventModal = ({ event, categoryName, onClose, onFavoriteToggle }) => {
     const [isFavorite, setIsFavorite] = useState(false);
+    const [hasTicket, setHasTicket] = useState(false); // 👇 Nuevo estado para saber si tiene entrada
     const orangeGradient = "linear-gradient(135deg, #c23b00 0%, #ff7a00 100%)";
+    const navigate = useNavigate();
 
     useEffect(() => {
         document.body.style.overflow = "hidden";
         
-        const checkFavoriteStatus = async () => {
+        const checkUserStatus = async () => {
             const token = localStorage.getItem("token");
             if (!token) return;
 
             try {
                 const backendUrl = import.meta.env.VITE_BACKEND_URL;
-                const response = await fetch(`${backendUrl}/api/favorites`, {
-                    headers: {
-                        "Authorization": `Bearer ${token}`,
-                        "Content-Type": "application/json"
-                    }
-                });
+                const headers = {
+                    "Authorization": `Bearer ${token}`,
+                    "Content-Type": "application/json"
+                };
 
-                if (response.ok) {
-                    const favoritesList = await response.json();
-                    const isAlreadySaved = favoritesList.some(fav => fav.event_id === event.id);
-                    setIsFavorite(isAlreadySaved);
+                // 👇 Hacemos dos peticiones al mismo tiempo: Favoritos y Entradas 👇
+                const [favsResponse, ticketsResponse] = await Promise.all([
+                    fetch(`${backendUrl}/api/favorites`, { headers }),
+                    fetch(`${backendUrl}/api/user/tickets`, { headers })
+                ]);
+
+                if (favsResponse.ok) {
+                    const favoritesList = await favsResponse.json();
+                    setIsFavorite(favoritesList.some(fav => fav.event_id === event.id));
                 }
+
+                if (ticketsResponse.ok) {
+                    const ticketsList = await ticketsResponse.json();
+                    setHasTicket(ticketsList.some(ticket => ticket.event_id === event.id));
+                }
+
             } catch (error) {
-                console.error("Error verificando favoritos:", error);
+                console.error("Error verificando el estado del usuario:", error);
             }
         };
 
-        checkFavoriteStatus();
+        checkUserStatus();
         
         return () => {
             document.body.style.overflow = "auto";
@@ -114,8 +126,27 @@ export const EventModal = ({ event, categoryName, onClose, onFavoriteToggle }) =
 
     const priceValue = parseFloat(event.price);
     const isFree = isNaN(priceValue) || priceValue <= 0;
-    
     const hasMultipleImages = event.imgs_event && event.imgs_event.length > 1;
+
+    let parsedGuests = [];
+    if (Array.isArray(event.guests)) {
+        parsedGuests = event.guests;
+    } else if (typeof event.guests === 'string') {
+        try {
+            parsedGuests = JSON.parse(event.guests); 
+        } catch (e) {
+            console.error("Error parseando invitados");
+        }
+    }
+
+    const getOrganizerName = () => {
+        if (event.organizer && event.organizer.name) {
+            return event.organizer.lastname 
+                ? `${event.organizer.name} ${event.organizer.lastname}`
+                : event.organizer.name;
+        }
+        return "Local Vibes"; 
+    };
 
     return (
         <div 
@@ -154,6 +185,15 @@ export const EventModal = ({ event, categoryName, onClose, onFavoriteToggle }) =
                 <div className="p-3">
                     <div className="position-relative w-100 rounded-4 overflow-hidden shadow-sm" style={{ height: "320px", backgroundColor: "#f8f9fa" }}>
                         
+                        {/* 👇 ETIQUETA VISUAL DE ENTRADA ADQUIRIDA 👇 */}
+                        {hasTicket && (
+                            <div className="position-absolute top-0 end-0 m-3 z-3">
+                                <span className="badge bg-success text-white px-3 py-2 rounded-pill shadow-sm d-flex align-items-center" style={{ fontSize: "0.9rem" }}>
+                                    <CheckCircle size={16} className="me-2" /> ¡Entrada adquirida!
+                                </span>
+                            </div>
+                        )}
+
                         {hasMultipleImages ? (
                             <div id={`carousel-${event.id}`} className="carousel slide h-100" data-bs-ride="carousel">
                                 <div className="carousel-inner h-100">
@@ -163,10 +203,10 @@ export const EventModal = ({ event, categoryName, onClose, onFavoriteToggle }) =
                                         </div>
                                     ))}
                                 </div>
-                                <button className="carousel-control-prev" type="button" data-bs-target={`#carousel-${event.id}`} data-bs-slide="prev">
+                                <button className="carousel-control-prev z-2" type="button" data-bs-target={`#carousel-${event.id}`} data-bs-slide="prev">
                                     <span className="bg-dark bg-opacity-50 rounded-circle p-2 d-flex justify-content-center align-items-center"><ChevronLeft size={24} color="white"/></span>
                                 </button>
-                                <button className="carousel-control-next" type="button" data-bs-target={`#carousel-${event.id}`} data-bs-slide="next">
+                                <button className="carousel-control-next z-2" type="button" data-bs-target={`#carousel-${event.id}`} data-bs-slide="next">
                                     <span className="bg-dark bg-opacity-50 rounded-circle p-2 d-flex justify-content-center align-items-center"><ChevronRight size={24} color="white"/></span>
                                 </button>
                             </div>
@@ -178,11 +218,11 @@ export const EventModal = ({ event, categoryName, onClose, onFavoriteToggle }) =
                             />
                         )}
 
-                        <span className="position-absolute bottom-0 start-0 m-3 badge rounded-pill px-3 py-2 text-uppercase shadow-sm" style={{ background: orangeGradient }}>
+                        <span className="position-absolute bottom-0 start-0 m-3 badge rounded-pill px-3 py-2 text-uppercase shadow-sm z-2" style={{ background: orangeGradient }}>
                             {categoryName || "Evento"}
                         </span>
                         
-                        <span className="position-absolute bottom-0 end-0 m-3 badge bg-white text-dark border rounded-pill px-3 py-2 shadow-sm">
+                        <span className="position-absolute bottom-0 end-0 m-3 badge bg-white text-dark border rounded-pill px-3 py-2 shadow-sm z-2">
                             {event.capacity ? `Aforo: ${event.capacity} personas` : "Aforo: No especificado"}
                         </span>
                     </div>
@@ -223,7 +263,7 @@ export const EventModal = ({ event, categoryName, onClose, onFavoriteToggle }) =
                             <div className="card bg-light border-0 py-3 h-100 rounded-4 shadow-sm hover-scale px-1">
                                 <small className="text-secondary mb-1" style={{fontSize: "0.8rem"}}>Organizador</small>
                                 <strong className="small text-dark text-truncate px-2">
-                                    {event.organizer?.name ? `${event.organizer.name} ${event.organizer.lastname || ''}` : "Local Vibes"}
+                                    {getOrganizerName()}
                                 </strong>
                             </div>
                         </div>
@@ -233,9 +273,29 @@ export const EventModal = ({ event, categoryName, onClose, onFavoriteToggle }) =
                     <div className="row g-3 mb-4">
                         {!isFree && (
                             <div className="col-12 col-md-6">
-                                <button className="btn w-100 rounded-pill py-3 fw-bold d-flex align-items-center justify-content-center text-white shadow-sm hover-scale" style={{ background: orangeGradient, border: "none" }}>
-                                    <Ticket size={18} className="me-2" /> Comprar entradas
-                                </button>
+                                {/* 👇 BOTÓN INTELIGENTE: Cambia si el usuario ya tiene la entrada 👇 */}
+                                {hasTicket ? (
+                                    <button 
+                                        className="btn w-100 rounded-pill py-3 fw-bold d-flex align-items-center justify-content-center text-white shadow-sm hover-scale bg-success border-0" 
+                                        onClick={() => {
+                                            onClose();
+                                            navigate("/profile?tab=tickets"); // Redirige al inventario de entradas
+                                        }}
+                                    >
+                                        <CheckCircle size={18} className="me-2" /> Ver mi entrada
+                                    </button>
+                                ) : (
+                                    <button 
+                                        className="btn w-100 rounded-pill py-3 fw-bold d-flex align-items-center justify-content-center text-white shadow-sm hover-scale" 
+                                        style={{ background: orangeGradient, border: "none" }}
+                                        onClick={() => {
+                                            onClose();
+                                            navigate(`/checkout/${event.id}`);
+                                        }}
+                                    >
+                                        <Ticket size={18} className="me-2" /> Comprar entradas
+                                    </button>
+                                )}
                             </div>
                         )}
                         
@@ -261,22 +321,16 @@ export const EventModal = ({ event, categoryName, onClose, onFavoriteToggle }) =
                         {event.description || "Disfruta de una experiencia inolvidable. Este evento reúne lo mejor de la cultura y el entretenimiento local. Te esperamos para compartir momentos únicos."}
                     </p>
 
-                    {/* 🔥 NUEVA SECCIÓN: INVITADOS ESPECIALES (CONDICIONAL) 🔥 */}
-                    {event.guests && event.guests.length > 0 && (
+                    {parsedGuests.length > 0 && (
                         <>
                             <h6 className="fw-bold mt-4 mb-3 d-flex align-items-center text-dark">
                                 <span style={{ width: "4px", height: "16px", background: orangeGradient, borderRadius: "2px", marginRight: "8px" }}></span>
                                 Invitados Especiales
                             </h6>
                             <div className="d-flex flex-wrap gap-2 mb-2">
-                                {event.guests.map((guest, index) => (
-                                    <span 
-                                        key={index} 
-                                        className="badge bg-light text-dark border px-3 py-2 rounded-pill d-flex align-items-center shadow-sm fw-medium hover-scale"
-                                        style={{ fontSize: "0.85rem" }}
-                                    >
-                                        <Mic size={14} className="me-2 text-primary" />
-                                        {guest}
+                                {parsedGuests.map((guest, index) => (
+                                    <span key={index} className="badge bg-light text-dark border px-3 py-2 rounded-pill d-flex align-items-center shadow-sm fw-medium hover-scale" style={{ fontSize: "0.85rem" }}>
+                                        <Mic size={14} className="me-2 text-primary" /> {guest}
                                     </span>
                                 ))}
                             </div>
@@ -303,9 +357,10 @@ export const EventModal = ({ event, categoryName, onClose, onFavoriteToggle }) =
             <style>{`
                 .hover-scale { transition: transform 0.2s ease, box-shadow 0.2s ease; }
                 .hover-scale:hover { transform: translateY(-2px); }
-                /* Ajustes de Bootstrap Carousel */
                 .carousel-control-prev, .carousel-control-next { opacity: 0.7; transition: opacity 0.2s; }
                 .carousel-control-prev:hover, .carousel-control-next:hover { opacity: 1; }
+                .z-2 { z-index: 2 !important; }
+                .z-3 { z-index: 3 !important; }
             `}</style>
         </div>
     );

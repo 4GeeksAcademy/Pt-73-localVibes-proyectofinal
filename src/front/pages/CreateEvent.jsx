@@ -120,9 +120,6 @@ export const CreateEvent = () => {
     });
 
     const [isFreeEvent, setIsFreeEvent] = useState(false);
-    const [hasGuests, setHasGuests] = useState(false);
-    const [guestList, setGuestList] = useState([]);
-    const [currentGuest, setCurrentGuest] = useState("");
     
     const [searchResults, setSearchResults] = useState([]);
     const [showDropdown, setShowDropdown] = useState(false);
@@ -157,15 +154,6 @@ export const CreateEvent = () => {
 
     // ======================== FUNCIONES ========================
     const handleChange = (e) => setFormData({ ...formData, [e.target.name]: e.target.value });
-
-    const handleGuests = (e, action, guest = null) => {
-        e.preventDefault();
-        if (action === "ADD" && currentGuest.trim() && !guestList.includes(currentGuest.trim())) {
-            setGuestList([...guestList, currentGuest.trim()]);
-            setCurrentGuest("");
-        }
-        if (action === "REMOVE") setGuestList(guestList.filter(g => g !== guest));
-    };
 
     const handleAddressSearch = (e) => {
         const query = e.target.value;
@@ -249,8 +237,7 @@ export const CreateEvent = () => {
                 capacity: parseInt(formData.capacity) || null,
                 latitude: formData.latitude ? parseFloat(formData.latitude) : null,
                 longitude: formData.longitude ? parseFloat(formData.longitude) : null,
-                imgs_event: uploadedImagesUrls,
-                guests: hasGuests ? guestList : []
+                imgs_event: uploadedImagesUrls
             };
 
             const response = await fetch(`${backendUrl}/api/events`, {

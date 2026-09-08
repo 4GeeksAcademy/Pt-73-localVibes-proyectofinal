@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import register from "../../images/register.jpg";
 import fondo from "../../images/fondo_completo.jpg";
@@ -14,6 +14,15 @@ export const Signup = () => {
 
     const [error, setError] = useState("");
     const navigate = useNavigate();
+
+    // 👇 EL GUARDIA DE SEGURIDAD 👇
+    // Si el usuario ya está logueado (tiene token), lo enviamos al home
+    useEffect(() => {
+        const token = localStorage.getItem("token");
+        if (token) {
+            navigate("/"); // Redirige al inicio para evitar que un usuario logueado vea el registro
+        }
+    }, [navigate]);
 
     const handleChange = (e) => {
         setFormData({

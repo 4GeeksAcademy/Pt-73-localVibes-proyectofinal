@@ -1,13 +1,23 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
-import loginImg from "../../images/login.jpg"; // Renombrado para evitar conflicto con el componente
+import loginImg from "../../images/login.jpg"; 
 import fondo from "../../images/fondo_completo.jpg";
+
 
 export const Login = () => {
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
     const [error, setError] = useState("");
     const navigate = useNavigate();
+
+    // 👇 EL GUARDIA DE SEGURIDAD 👇
+    // Si el usuario ya está logueado (tiene token), lo enviamos al home
+    useEffect(() => {
+        const token = localStorage.getItem("token");
+        if (token) {
+            navigate("/"); // Cambia a "/profile" si prefieres que vayan directo a su perfil
+        }
+    }, [navigate]);
 
     const handleSubmit = async (e) => {
         e.preventDefault();

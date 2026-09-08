@@ -1,5 +1,4 @@
 import React, { useState } from "react";
-// 👇 Importa el componente de tu compañero (ajusta la ruta según la estructura de tu proyecto)
 import { ImageUpload } from "../ImageUpload";
 
 export const TabSettings = ({ user }) => {
@@ -8,26 +7,56 @@ export const TabSettings = ({ user }) => {
     const [formData, setFormData] = useState({
         name: user.name || "",
         lastname: user.lastname || "",
-        phone: "+58 ",
         avatar: user.avatar || ""
     });
     
     const [saved, setSaved] = useState(false);
+    const [isSubmitting, setIsSubmitting] = useState(false);
 
     const handleChange = (e) => {
         setFormData({ ...formData, [e.target.name]: e.target.value });
     };
 
-    // 👇 Función específica para manejar lo que devuelve el componente ImageUpload
     const handleAvatarUpload = (imageUrl) => {
         setFormData({ ...formData, avatar: imageUrl });
     };
 
-    const handleSubmit = (e) => {
+    const handleSubmit = async (e) => {
         e.preventDefault();
-        // Aquí iría tu fetch al endpoint de editar perfil (PUT)
-        setSaved(true);
-        setTimeout(() => setSaved(false), 3000);
+        setIsSubmitting(true);
+        
+        const token = localStorage.getItem("token");
+        const backendUrl = import.meta.env.VITE_BACKEND_URL;
+
+        try {
+            // Llamado real a la API para actualizar el perfil
+            const response = await fetch(`${backendUrl}/api/profile`, {
+                method: "PUT",
+                headers: {
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer ${token}`
+                },
+                body: JSON.stringify({
+                    name: formData.name,
+                    lastname: formData.lastname,
+                    avatar: formData.avatar
+                })
+            });
+
+            if (response.ok) {
+                setSaved(true);
+                // Si tienes un contexto global (Context/Flux), deberías actualizar los datos del usuario aquí.
+                setTimeout(() => setSaved(false), 3000);
+            } else {
+                const errorData = await response.json();
+                alert(errorData.message || "No se pudo actualizar el perfil.");
+            }
+        } catch (error) {
+            console.error("Error al actualizar:", error);
+            alert("Error de conexión con el servidor.");
+        } finally {
+            setIsSubmitting(false);
+        }
     };
 
     return (
@@ -36,7 +65,7 @@ export const TabSettings = ({ user }) => {
             <p className="text-muted mb-5">Actualiza tu información personal y foto de perfil.</p>
 
             {saved && (
-                <div className="alert alert-success border-0 shadow-sm rounded-4 mb-4 fw-medium text-center">
+                <div className="alert alert-success border-0 shadow-sm rounded-4 mb-4 fw-medium text-center animate__animated animate__fadeInDown">
                     ¡Cambios guardados con éxito!
                 </div>
             )}
@@ -46,42 +75,57 @@ export const TabSettings = ({ user }) => {
                     <form onSubmit={handleSubmit}>
                         <h5 className="fw-bold mb-4 border-bottom pb-2">Datos Básicos</h5>
                         
-                        {/* SECCIÓN DEL AVATAR (Movida arriba para mejor UX) */}
+                        {/* SECCIÓN DEL AVATAR */}
                         <div className="mb-4">
                             <label className="form-label fw-bold small text-muted">Foto de Perfil (Avatar)</label>
-                            {/* 
-                              Aquí insertamos el componente de tu compañero.
-                              NOTA: Pregúntale a tu compañero cómo se llaman exactamente las props 
-                              para pasarle el URL y para recibir el nuevo URL (aquí usé onUpload)
-                            */}
                             <ImageUpload 
                                 currentImage={formData.avatar} 
-                                onUpload={handleAvatarUpload} 
+                                onImagesUploaded={(urls) => handleAvatarUpload(urls[0])} 
                             />
                         </div>
 
                         <div className="row g-4 mb-5">
                             <div className="col-12 col-md-6">
                                 <label className="form-label fw-bold small text-muted">Nombre</label>
-                                <input type="text" className="form-control rounded-3 py-2" name="name" value={formData.name} onChange={handleChange} required />
+                                <input 
+                                    type="text" 
+                                    className="form-control rounded-3 py-2" 
+                                    name="name" 
+                                    value={formData.name} 
+                                    onChange={handleChange} 
+                                    required 
+                                />
                             </div>
                             <div className="col-12 col-md-6">
                                 <label className="form-label fw-bold small text-muted">Apellido</label>
-                                <input type="text" className="form-control rounded-3 py-2" name="lastname" value={formData.lastname} onChange={handleChange} required />
+                                <input 
+                                    type="text" 
+                                    className="form-control rounded-3 py-2" 
+                                    name="lastname" 
+                                    value={formData.lastname} 
+                                    onChange={handleChange} 
+                                    required 
+                                />
                             </div>
-                            <div className="col-12 col-md-6">
+                            <div className="col-12">
                                 <label className="form-label fw-bold small text-muted">Correo Electrónico (Solo lectura)</label>
-                                <input type="email" className="form-control rounded-3 py-2 bg-light text-muted" value={user.email} disabled />
-                            </div>
-                            <div className="col-12 col-md-6">
-                                <label className="form-label fw-bold small text-muted">Teléfono de contacto</label>
-                                <input type="tel" className="form-control rounded-3 py-2" name="phone" value={formData.phone} onChange={handleChange} />
+                                <input 
+                                    type="email" 
+                                    className="form-control rounded-3 py-2 bg-light text-muted" 
+                                    value={user.email} 
+                                    disabled 
+                                />
                             </div>
                         </div>
 
                         <div className="d-flex justify-content-end">
-                            <button type="submit" className="btn px-5 py-2 rounded-pill text-white fw-bold shadow-sm hover-scale" style={{ background: orangeGradient, border: "none" }}>
-                                Guardar Cambios
+                            <button 
+                                type="submit" 
+                                disabled={isSubmitting}
+                                className="btn px-5 py-2 rounded-pill text-white fw-bold shadow-sm hover-scale" 
+                                style={{ background: isSubmitting ? "#ccc" : orangeGradient, border: "none" }}
+                            >
+                                {isSubmitting ? "Guardando..." : "Guardar Cambios"}
                             </button>
                         </div>
                     </form>

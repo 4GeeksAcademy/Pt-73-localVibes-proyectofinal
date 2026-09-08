@@ -9,6 +9,8 @@ import { Events } from "./pages/Events";
 import { MapPage } from "./pages/MapPage";
 import { CreateEvent } from "./pages/CreateEvent";
 import { Favorites } from "./pages/Favorites";
+import { EditEvent } from "./pages/EditEvent";
+import { Checkout } from "./pages/Checkout";
 
 export const router = createBrowserRouter(
     createRoutesFromElements(

@@ -261,9 +261,9 @@ def login():
     }), 200
 
 
-@api.route('/profile', methods=['GET'])
+@api.route('/profile', methods=['GET', 'PUT'])
 @jwt_required()
-def get_profile():
+def handle_profile():
     current_user_id = get_jwt_identity()
 
     user = db.session.get(User, int(current_user_id))
@@ -355,6 +355,71 @@ def create_event():
         "event": new_event.serialize()
     }), 201
 
+# Obtener los eventos creados por el usuario actual
+@api.route('/user/events', methods=['GET'])
+@jwt_required()
+def get_my_events():
+    current_user_id = int(get_jwt_identity())
+    
+    # Buscamos todos los eventos donde este usuario sea el organizador (pasados y futuros)
+    stmt = select(Event).where(Event.organizer_id == current_user_id).order_by(Event.start_time.desc())
+    my_events = db.session.scalars(stmt).all()
+    
+    return jsonify([event.serialize() for event in my_events]), 200
+
+
+# Eliminar un evento
+@api.route('/events/<int:event_id>', methods=['DELETE'])
+@jwt_required()
+def delete_event(event_id):
+    current_user_id = int(get_jwt_identity())
+    event = db.session.get(Event, event_id)
+    
+    if not event:
+        return jsonify({"message": "Evento no encontrado"}), 404
+        
+    # Verificar que el usuario que intenta borrarlo es el dueño
+    if event.organizer_id != current_user_id:
+        return jsonify({"message": "No tienes permiso para eliminar este evento"}), 403
+        
+    db.session.delete(event)
+    db.session.commit()
+    
+    return jsonify({"message": "Evento eliminado con éxito"}), 200
+
+# Editar un evento
+@api.route('/events/<int:event_id>', methods=['PUT'])
+@jwt_required()
+def update_event(event_id):
+    current_user_id = int(get_jwt_identity())
+    event = db.session.get(Event, event_id)
+    
+    if not event:
+        return jsonify({"message": "Evento no encontrado"}), 404
+        
+    # Verificar que el usuario que intenta editarlo es el dueño
+    if event.organizer_id != current_user_id:
+        return jsonify({"message": "No tienes permiso para editar este evento"}), 403
+        
+    body = request.get_json()
+    
+    # Actualizamos los campos si vienen en el body
+    if "title" in body: event.title = body["title"]
+    if "category_id" in body: event.category_id = body["category_id"]
+    if "location_name" in body: event.location_name = body["location_name"]
+    if "address" in body: event.address = body["address"]
+    if "start_time" in body: event.start_time = body["start_time"]
+    if "end_time" in body: event.end_time = body["end_time"]
+    if "description" in body: event.description = body["description"]
+    if "price" in body: event.price = body["price"]
+    if "capacity" in body: event.capacity = body["capacity"]
+    if "latitude" in body: event.latitude = body["latitude"]
+    if "longitude" in body: event.longitude = body["longitude"]
+    if "imgs_event" in body: event.imgs_event = body["imgs_event"]
+
+    db.session.commit()
+    
+    return jsonify({"message": "Evento actualizado con éxito", "event": event.serialize()}), 200
 
 # =============================================================
 # 7. FAVORITOS
