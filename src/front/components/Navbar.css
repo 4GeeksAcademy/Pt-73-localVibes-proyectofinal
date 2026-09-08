@@ -10,12 +10,10 @@
 }
 
 /* 1. SECCIÓN LOGO */
-.navbar-logo {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    text-decoration: none;
-    color: inherit;
+.navbar-logo-img {
+    width: 140px;
+    height: auto;
+    display: block;
 }
 
 .logo-icon-container {

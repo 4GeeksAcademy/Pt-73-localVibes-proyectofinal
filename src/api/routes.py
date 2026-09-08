@@ -5,13 +5,14 @@ from flask_cors import CORS
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask_jwt_extended import create_access_token, jwt_required, get_jwt_identity
 from sqlalchemy import select, or_, delete
-from datetime import datetime
+from datetime import datetime, timedelta
+import secrets
 import cloudinary.uploader
-from flask import Blueprint, request, jsonify
-from datetime import datetime
+from flask_mail import Message
+from api.mail import mail
 
 api = Blueprint('api', __name__)
-CORS(api)
+
 
 # =============================================================
 # 1. AUTENTICACIÓN Y USUARIOS
@@ -21,14 +22,29 @@ CORS(api)
 def signup():
     body = request.get_json()
     required_fields = ["email", "password", "username", "name", "lastname"]
-    if not body or any(field not in body or not body[field] for field in required_fields):
-        return jsonify({"message": f"Faltan datos obligatorios: {', '.join(required_fields)}"}), 400
 
-    stmt = select(User).where(or_(User.email == body["email"], User.username == body["username"]))
+    if not body or any(field not in body or not body[field] for field in required_fields):
+        return jsonify({
+            "message": f"Faltan datos obligatorios: {', '.join(required_fields)}"
+        }), 400
+
+    stmt = select(User).where(
+        or_(
+            User.email == body["email"],
+            User.username == body["username"]
+        )
+    )
+
     if db.session.scalar(stmt):
-        return jsonify({"message": "El username o el email ya se encuentran registrados"}), 400
+        return jsonify({
+            "message": "El username o el email ya se encuentran registrados"
+        }), 400
 
     hashed_password = generate_password_hash(body["password"])
+
+    # Código de verificación de 6 dígitos
+    verification_code = str(secrets.randbelow(1000000)).zfill(6)
+
     new_user = User(
         username=body["username"],
         email=body["email"],
@@ -37,72 +53,247 @@ def signup():
         lastname=body["lastname"],
         role=body.get("role", "user"),
         is_active=True,
-        email_verify=False
+        email_verify=False,
+        verification_code=verification_code,
+        verification_code_expires_at=datetime.utcnow() + timedelta(minutes=10)
     )
+
     db.session.add(new_user)
     db.session.commit()
 
-    return jsonify({"message": "Usuario registrado exitosamente", "user": new_user.serialize()}), 201
+    # Enviar código por correo
+    try:
+        msg = Message(
+            subject="Verifica tu correo - Local Vibes",
+            recipients=[new_user.email],
+            body=f"""Hola {new_user.name},
 
+Gracias por registrarte en Local Vibes.
+
+Tu código de verificación es:
+
+{verification_code}
+
+Este código vence en 10 minutos.
+
+Si no realizaste este registro, puedes ignorar este correo.
+
+¡Bienvenido a Local Vibes!
+"""
+        )
+
+        mail.send(msg)
+
+    except Exception as e:
+        print("Error enviando correo:", e)
+
+        return jsonify({
+            "message": "Usuario registrado, pero no se pudo enviar el correo de verificación."
+        }), 500
+
+    return jsonify({
+        "message": "Usuario registrado exitosamente. Revisa tu correo para obtener el código de verificación.",
+        "email": new_user.email
+    }), 201
+
+
+# =============================================================
+# 2. VERIFICAR CORREO ELECTRÓNICO
+# =============================================================
+
+@api.route('/verify-email', methods=['POST'])
+def verify_email():
+    body = request.get_json()
+
+    email = body.get("email") if body else None
+    code = body.get("code") if body else None
+
+    if not email or not code:
+        return jsonify({
+            "message": "Se requiere el email y el código de verificación"
+        }), 400
+
+    stmt = select(User).where(User.email == email)
+    user = db.session.scalar(stmt)
+
+    if not user:
+        return jsonify({
+            "message": "Usuario no encontrado"
+        }), 404
+
+    if user.email_verify:
+        return jsonify({
+            "message": "El correo ya se encuentra verificado"
+        }), 400
+
+    if user.verification_code != code:
+        return jsonify({
+            "message": "El código de verificación es incorrecto"
+        }), 400
+
+    if not user.verification_code_expires_at:
+        return jsonify({
+            "message": "El código de verificación no es válido"
+        }), 400
+
+    if datetime.utcnow() > user.verification_code_expires_at:
+        return jsonify({
+            "message": "El código de verificación ha expirado"
+        }), 400
+
+    # Verificación exitosa
+    user.email_verify = True
+    user.verification_code = None
+    user.verification_code_expires_at = None
+
+    db.session.commit()
+
+    return jsonify({
+        "message": "Correo electrónico verificado exitosamente"
+    }), 200
+
+
+# =============================================================
+# 3. REENVIAR CÓDIGO DE VERIFICACIÓN
+# =============================================================
+
+@api.route('/resend-verification', methods=['POST'])
+def resend_verification():
+    body = request.get_json()
+
+    email = body.get("email") if body else None
+
+    if not email:
+        return jsonify({
+            "message": "Se requiere el email"
+        }), 400
+
+    stmt = select(User).where(User.email == email)
+    user = db.session.scalar(stmt)
+
+    if not user:
+        return jsonify({
+            "message": "Usuario no encontrado"
+        }), 404
+
+    if user.email_verify:
+        return jsonify({
+            "message": "El correo ya se encuentra verificado"
+        }), 400
+
+    # Generar nuevo código
+    verification_code = str(secrets.randbelow(1000000)).zfill(6)
+
+    user.verification_code = verification_code
+    user.verification_code_expires_at = datetime.utcnow() + timedelta(minutes=10)
+
+    db.session.commit()
+
+    # Enviar nuevo correo
+    try:
+        msg = Message(
+            subject="Nuevo código de verificación - Local Vibes",
+            recipients=[user.email],
+            body=f"""Hola {user.name},
+
+Tu nuevo código de verificación para Local Vibes es:
+
+{verification_code}
+
+Este código vence en 10 minutos.
+
+Si no realizaste esta solicitud, puedes ignorar este correo.
+
+¡Gracias!
+"""
+        )
+
+        mail.send(msg)
+
+    except Exception as e:
+        print("Error enviando correo:", e)
+
+        return jsonify({
+            "message": "No se pudo enviar el nuevo código de verificación."
+        }), 500
+
+    return jsonify({
+        "message": "Nuevo código enviado correctamente"
+    }), 200
+
+
+# =============================================================
+# 4. LOGIN
+# =============================================================
 
 @api.route('/login', methods=['POST'])
 def login():
     body = request.get_json()
+
     if not body or not body.get("email") or not body.get("password"):
-        return jsonify({"message": "Se requiere email y contraseña"}), 400
+        return jsonify({
+            "message": "Se requiere email y contraseña"
+        }), 400
 
     stmt = select(User).where(User.email == body["email"])
     user = db.session.scalar(stmt)
 
-    if not user or not check_password_hash(user.password_hash, body["password"]):
-        return jsonify({"message": "Credenciales inválidas"}), 401
+    if not user or not check_password_hash(
+        user.password_hash,
+        body["password"]
+    ):
+        return jsonify({
+            "message": "Credenciales inválidas"
+        }), 401
+
+    # No permitir login si el correo no está verificado
+    if not user.email_verify:
+        return jsonify({
+            "message": "Debes verificar tu correo electrónico antes de iniciar sesión."
+        }), 403
 
     access_token = create_access_token(identity=str(user.id))
-    return jsonify({"message": "Inicio de sesión exitoso", "token": access_token, "user": user.serialize()}), 200
+
+    return jsonify({
+        "message": "Inicio de sesión exitoso",
+        "token": access_token,
+        "user": user.serialize()
+    }), 200
 
 
 @api.route('/profile', methods=['GET', 'PUT'])
 @jwt_required()
 def handle_profile():
     current_user_id = get_jwt_identity()
-    user = db.session.get(User, int(current_user_id))
-    
-    if not user:
-        return jsonify({"message": "Usuario no encontrado"}), 404
 
-    # Si es GET, devolvemos los datos como ya lo tenías
-    if request.method == 'GET':
-        return jsonify(user.serialize()), 200
-        
-    # Si es PUT, actualizamos los datos
-    if request.method == 'PUT':
-        body = request.get_json()
-        
-        # Actualizamos solo si vienen en el body
-        if "name" in body:
-            user.name = body["name"]
-        if "lastname" in body:
-            user.lastname = body["lastname"]
-        if "avatar" in body:
-            user.avatar = body["avatar"]
-            
-        db.session.commit()
-        return jsonify({"message": "Perfil actualizado con éxito", "user": user.serialize()}), 200
+    user = db.session.get(User, int(current_user_id))
+
+    if not user:
+        return jsonify({
+            "message": "Usuario no encontrado"
+        }), 404
+
+    return jsonify(user.serialize()), 200
 
 
 # =============================================================
-# 2. CATEGORÍAS
+# 5. CATEGORÍAS
 # =============================================================
 
 @api.route('/categories', methods=['GET'])
 def get_categories():
     stmt = select(Category)
+
     categories = db.session.scalars(stmt).all()
-    return jsonify([category.serialize() for category in categories]), 200
+
+    return jsonify([
+        category.serialize()
+        for category in categories
+    ]), 200
 
 
 # =============================================================
-# 3. EVENTOS (ESTA ES LA RUTA QUE USA EL MAPA)
+# 6. EVENTOS
 # =============================================================
 
 @api.route('/events', methods=['GET'])
@@ -119,14 +310,22 @@ def get_events():
         stmt = stmt.where(Event.category_id == int(category_id))
 
     events = db.session.scalars(stmt).all()
-    return jsonify([event.serialize() for event in events]), 200
+
+    return jsonify([
+        event.serialize()
+        for event in events
+    ]), 200
 
 
 @api.route('/events/<int:event_id>', methods=['GET'])
 def get_event_detail(event_id):
     event = db.session.get(Event, event_id)
+
     if not event:
-        return jsonify({"message": "Evento no encontrado"}), 404
+        return jsonify({
+            "message": "Evento no encontrado"
+        }), 404
+
     return jsonify(event.serialize()), 200
 
 
@@ -136,8 +335,6 @@ def create_event():
     body = request.get_json()
     current_user_id = int(get_jwt_identity())
 
-    # Verificamos que vengan los datos requeridos...
-    
     new_event = Event(
         title=body.get("title"),
         category_id=body.get("category_id"),
@@ -150,16 +347,17 @@ def create_event():
         longitude=body.get("longitude"),
         imgs_event=body.get("imgs_event"),
         organizer_id=current_user_id,
-
-        # 👇 ¡AGREGA ESTAS DOS LÍNEAS AQUÍ! 👇
         price=body.get("price", 0.0),
-        end_time=body.get("end_time") 
+        end_time=body.get("end_time")
     )
 
     db.session.add(new_event)
     db.session.commit()
 
-    return jsonify({"message": "Evento creado exitosamente", "event": new_event.serialize()}), 201
+    return jsonify({
+        "message": "Evento creado exitosamente",
+        "event": new_event.serialize()
+    }), 201
 
 # Obtener los eventos creados por el usuario actual
 @api.route('/user/events', methods=['GET'])
@@ -228,77 +426,102 @@ def update_event(event_id):
     return jsonify({"message": "Evento actualizado con éxito", "event": event.serialize()}), 200
 
 # =============================================================
-# 4. FAVORITOS
+# 7. FAVORITOS
 # =============================================================
 
 @api.route('/favorites', methods=['GET'])
 @jwt_required()
 def get_favorites():
     current_user_id = int(get_jwt_identity())
-    stmt = select(FavoriteEvent).where(FavoriteEvent.user_id == current_user_id)
+
+    stmt = select(FavoriteEvent).where(
+        FavoriteEvent.user_id == current_user_id
+    )
+
     favorites = db.session.scalars(stmt).all()
-    return jsonify([fav.serialize() for fav in favorites]), 200
+
+    return jsonify([
+        fav.serialize()
+        for fav in favorites
+    ]), 200
+
 
 @api.route('/favorites/<int:event_id>', methods=['POST'])
 @jwt_required()
 def add_favorite(event_id):
     current_user_id = int(get_jwt_identity())
-    
-    # 1. Verificamos si ya existe en la base de datos
+
     stmt = select(FavoriteEvent).where(
-        FavoriteEvent.user_id == current_user_id, 
+        FavoriteEvent.user_id == current_user_id,
         FavoriteEvent.event_id == event_id
     )
+
     existing_favorite = db.session.scalars(stmt).first()
-    
-    # 2. Si ya existe, devolvemos un mensaje y evitamos el duplicado (Código 400 o 200)
+
     if existing_favorite:
-        return jsonify({"message": "Este evento ya se encuentra en tus favoritos"}), 400
-    
-    # 3. Si no existe, lo creamos normalmente
-    new_favorite = FavoriteEvent(user_id=current_user_id, event_id=event_id)
+        return jsonify({
+            "message": "Este evento ya se encuentra en tus favoritos"
+        }), 400
+
+    new_favorite = FavoriteEvent(
+        user_id=current_user_id,
+        event_id=event_id
+    )
+
     db.session.add(new_favorite)
     db.session.commit()
-    
-    return jsonify({"message": "Agregado a favoritos"}), 201
+
+    return jsonify({
+        "message": "Agregado a favoritos"
+    }), 201
+
 
 @api.route('/favorites/<int:event_id>', methods=['DELETE'])
 @jwt_required()
 def remove_favorite(event_id):
     current_user_id = int(get_jwt_identity())
-    
-    # Buscamos el favorito exacto de este usuario y este evento
+
     stmt = select(FavoriteEvent).where(
-        FavoriteEvent.user_id == current_user_id, 
+        FavoriteEvent.user_id == current_user_id,
         FavoriteEvent.event_id == event_id
     )
+
     favorite_to_delete = db.session.scalars(stmt).first()
-    
+
     if favorite_to_delete is None:
-        return jsonify({"error": "El favorito no existe"}), 404
+        return jsonify({
+            "error": "El favorito no existe"
+        }), 404
 
     db.session.delete(favorite_to_delete)
     db.session.commit()
-    return jsonify({"message": "Eliminado de favoritos"}), 200
+
+    return jsonify({
+        "message": "Eliminado de favoritos"
+    }), 200
+
 
 # =============================================================
-# 5. Tickets
+# 8. TICKETS / DASHBOARD
 # =============================================================
 
 @api.route('/user/dashboard-stats', methods=['GET'])
 @jwt_required()
 def get_dashboard_stats():
     current_user_id = int(get_jwt_identity())
-    
-    # 1. Contamos cuántos eventos ha creado (organizer_id)
-    created_events = Event.query.filter_by(organizer_id=current_user_id).count()
-    
-    # 2. Contamos cuántos favoritos tiene guardados
-    saved_favorites = FavoriteEvent.query.filter_by(user_id=current_user_id).count()
-    
-    # 3. Contamos cuántas entradas ha comprado
-    purchased_tickets = Ticket.query.filter_by(user_id=current_user_id).count()
-    
+
+    created_events = Event.query.filter_by(
+        organizer_id=current_user_id
+    ).count()
+
+    saved_favorites = FavoriteEvent.query.filter_by(
+        user_id=current_user_id
+    ).count()
+
+    purchased_tickets = Ticket.query.filter_by(
+        user_id=current_user_id
+    ).count()
+
     return jsonify({
         "created_events": created_events,
         "saved_favorites": saved_favorites,
