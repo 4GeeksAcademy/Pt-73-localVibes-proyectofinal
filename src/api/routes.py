@@ -1,6 +1,5 @@
 from flask import Flask, request, jsonify, url_for, Blueprint
-from api.models import db, User, Category, Event, FavoriteEvent, Ticket
-from api.models import db, User, Category, Event, FavoriteEvent, UserMedia
+from api.models import db, User, Category, Event, FavoriteEvent, Ticket, UserMedia
 from flask_cors import CORS
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask_jwt_extended import create_access_token, jwt_required, get_jwt_identity
@@ -223,7 +222,7 @@ Si no realizaste esta solicitud, puedes ignorar este correo.
 
 
 # =============================================================
-# 4. LOGIN
+# 4. LOGIN & PERFIL UNIFICADO
 # =============================================================
 
 @api.route('/login', methods=['POST'])
@@ -246,7 +245,6 @@ def login():
             "message": "Credenciales inválidas"
         }), 401
 
-    # No permitir login si el correo no está verificado
     if not user.email_verify:
         return jsonify({
             "message": "Debes verificar tu correo electrónico antes de iniciar sesión."
@@ -265,15 +263,34 @@ def login():
 @jwt_required()
 def handle_profile():
     current_user_id = get_jwt_identity()
-
     user = db.session.get(User, int(current_user_id))
 
     if not user:
-        return jsonify({
-            "message": "Usuario no encontrado"
-        }), 404
+        return jsonify({"message": "Usuario no encontrado"}), 404
 
-    return jsonify(user.serialize()), 200
+    # GET: Enviar datos al frontend
+    if request.method == 'GET':
+        return jsonify(user.serialize()), 200
+
+    # PUT: Guardar cambios desde el frontend (incluye foto de Cloudinary)
+    if request.method == 'PUT':
+        data = request.get_json()
+        
+        new_avatar_url = data.get("image_url")
+        if new_avatar_url:
+            user.avatar = new_avatar_url 
+            
+        if "name" in data:
+            user.name = data["name"]
+        if "lastname" in data:
+            user.lastname = data["lastname"]
+            
+        db.session.commit()
+        
+        return jsonify({
+            "message": "Perfil actualizado con éxito", 
+            "user": user.serialize()
+        }), 200
 
 
 # =============================================================
@@ -283,13 +300,8 @@ def handle_profile():
 @api.route('/categories', methods=['GET'])
 def get_categories():
     stmt = select(Category)
-
     categories = db.session.scalars(stmt).all()
-
-    return jsonify([
-        category.serialize()
-        for category in categories
-    ]), 200
+    return jsonify([category.serialize() for category in categories]), 200
 
 
 # =============================================================
@@ -299,18 +311,19 @@ def get_categories():
 @api.route('/events', methods=['GET'])
 def get_events():
     category_id = request.args.get('category_id')
-
-    stmt = select(Event).where(Event.status == "active")
+    
+    # 👇 Filtro estricto: Solo muestra eventos cuya fecha de inicio sea MAYOR a la hora y fecha actual
+    stmt = select(Event).where(
+        Event.status == "active",
+        Event.start_time >= datetime.now()
+    )
 
     if category_id:
         stmt = stmt.where(Event.category_id == int(category_id))
 
     events = db.session.scalars(stmt).all()
-
-    return jsonify([
-        event.serialize()
-        for event in events
-    ]), 200
+    
+    return jsonify([event.serialize() for event in events]), 200
 
 
 @api.route('/events/<int:event_id>', methods=['GET'])
@@ -318,10 +331,7 @@ def get_event_detail(event_id):
     event = db.session.get(Event, event_id)
 
     if not event:
-        return jsonify({
-            "message": "Evento no encontrado"
-        }), 404
-
+        return jsonify({"message": "Evento no encontrado"}), 404
     return jsonify(event.serialize()), 200
 
 
@@ -330,6 +340,15 @@ def get_event_detail(event_id):
 def create_event():
     body = request.get_json()
     current_user_id = int(get_jwt_identity())
+
+    # Extraer imágenes para arreglar Explorar
+    imgs = body.get("imgs_event", [])
+    
+    if isinstance(imgs, str):
+        main_image = imgs
+        imgs = [imgs]
+    else:
+        main_image = imgs[0] if isinstance(imgs, list) and len(imgs) > 0 else None
 
     new_event = Event(
         title=body.get("title"),
@@ -341,7 +360,8 @@ def create_event():
         capacity=body.get("capacity"),
         latitude=body.get("latitude"),
         longitude=body.get("longitude"),
-        imgs_event=body.get("imgs_event"),
+        imgs_event=imgs,
+        image_url=main_image, # Retrocompatibilidad
         organizer_id=current_user_id,
         price=body.get("price", 0.0),
         end_time=body.get("end_time")
@@ -421,6 +441,65 @@ def update_event(event_id):
     
     return jsonify({"message": "Evento actualizado con éxito", "event": event.serialize()}), 200
 
+@api.route('/user/events', methods=['GET'])
+@jwt_required()
+def get_my_events():
+    current_user_id = int(get_jwt_identity())
+    stmt = select(Event).where(Event.organizer_id == current_user_id).order_by(Event.start_time.desc())
+    my_events = db.session.scalars(stmt).all()
+    return jsonify([event.serialize() for event in my_events]), 200
+
+
+@api.route('/events/<int:event_id>', methods=['DELETE'])
+@jwt_required()
+def delete_event(event_id):
+    current_user_id = int(get_jwt_identity())
+    event = db.session.get(Event, event_id)
+    
+    if not event:
+        return jsonify({"message": "Evento no encontrado"}), 404
+        
+    if event.organizer_id != current_user_id:
+        return jsonify({"message": "No tienes permiso para eliminar este evento"}), 403
+        
+    db.session.delete(event)
+    db.session.commit()
+    
+    return jsonify({"message": "Evento eliminado con éxito"}), 200
+
+
+@api.route('/events/<int:event_id>', methods=['PUT'])
+@jwt_required()
+def update_event(event_id):
+    current_user_id = int(get_jwt_identity())
+    event = db.session.get(Event, event_id)
+    
+    if not event:
+        return jsonify({"message": "Evento no encontrado"}), 404
+        
+    if event.organizer_id != current_user_id:
+        return jsonify({"message": "No tienes permiso para editar este evento"}), 403
+        
+    body = request.get_json()
+    
+    if "title" in body: event.title = body["title"]
+    if "category_id" in body: event.category_id = body["category_id"]
+    if "location_name" in body: event.location_name = body["location_name"]
+    if "address" in body: event.address = body["address"]
+    if "start_time" in body: event.start_time = body["start_time"]
+    if "end_time" in body: event.end_time = body["end_time"]
+    if "description" in body: event.description = body["description"]
+    if "price" in body: event.price = body["price"]
+    if "capacity" in body: event.capacity = body["capacity"]
+    if "latitude" in body: event.latitude = body["latitude"]
+    if "longitude" in body: event.longitude = body["longitude"]
+    if "imgs_event" in body: event.imgs_event = body["imgs_event"]
+
+    db.session.commit()
+    
+    return jsonify({"message": "Evento actualizado con éxito", "event": event.serialize()}), 200
+
+
 # =============================================================
 # 7. FAVORITOS
 # =============================================================
@@ -430,16 +509,10 @@ def update_event(event_id):
 def get_favorites():
     current_user_id = int(get_jwt_identity())
 
-    stmt = select(FavoriteEvent).where(
-        FavoriteEvent.user_id == current_user_id
-    )
-
+    stmt = select(FavoriteEvent).where(FavoriteEvent.user_id == current_user_id)
     favorites = db.session.scalars(stmt).all()
 
-    return jsonify([
-        fav.serialize()
-        for fav in favorites
-    ]), 200
+    return jsonify([fav.serialize() for fav in favorites]), 200
 
 
 @api.route('/favorites/<int:event_id>', methods=['POST'])
@@ -452,24 +525,14 @@ def add_favorite(event_id):
         FavoriteEvent.event_id == event_id
     )
 
-    existing_favorite = db.session.scalars(stmt).first()
+    if db.session.scalars(stmt).first():
+        return jsonify({"message": "Este evento ya se encuentra en tus favoritos"}), 400
 
-    if existing_favorite:
-        return jsonify({
-            "message": "Este evento ya se encuentra en tus favoritos"
-        }), 400
-
-    new_favorite = FavoriteEvent(
-        user_id=current_user_id,
-        event_id=event_id
-    )
-
+    new_favorite = FavoriteEvent(user_id=current_user_id, event_id=event_id)
     db.session.add(new_favorite)
     db.session.commit()
 
-    return jsonify({
-        "message": "Agregado a favoritos"
-    }), 201
+    return jsonify({"message": "Agregado a favoritos"}), 201
 
 
 @api.route('/favorites/<int:event_id>', methods=['DELETE'])
@@ -484,21 +547,17 @@ def remove_favorite(event_id):
 
     favorite_to_delete = db.session.scalars(stmt).first()
 
-    if favorite_to_delete is None:
-        return jsonify({
-            "error": "El favorito no existe"
-        }), 404
+    if not favorite_to_delete:
+        return jsonify({"error": "El favorito no existe"}), 404
 
     db.session.delete(favorite_to_delete)
     db.session.commit()
 
-    return jsonify({
-        "message": "Eliminado de favoritos"
-    }), 200
+    return jsonify({"message": "Eliminado de favoritos"}), 200
 
 
 # =============================================================
-# 8. TICKETS / DASHBOARD
+# 8. DASHBOARD STATS
 # =============================================================
 
 @api.route('/user/dashboard-stats', methods=['GET'])
@@ -506,17 +565,9 @@ def remove_favorite(event_id):
 def get_dashboard_stats():
     current_user_id = int(get_jwt_identity())
 
-    created_events = Event.query.filter_by(
-        organizer_id=current_user_id
-    ).count()
-
-    saved_favorites = FavoriteEvent.query.filter_by(
-        user_id=current_user_id
-    ).count()
-
-    purchased_tickets = Ticket.query.filter_by(
-        user_id=current_user_id
-    ).count()
+    created_events = Event.query.filter_by(organizer_id=current_user_id).count()
+    saved_favorites = FavoriteEvent.query.filter_by(user_id=current_user_id).count()
+    purchased_tickets = Ticket.query.filter_by(user_id=current_user_id).count()
 
     return jsonify({
         "created_events": created_events,
@@ -526,16 +577,14 @@ def get_dashboard_stats():
 
 
 # =============================================================
-# 9. CLOUDINARY
+# 9. CLOUDINARY (Subida de imágenes general)
 # =============================================================
 
 @api.route('/upload', methods=['POST'])
 def upload_images():
     if 'images' not in request.files:
-        return jsonify({
-            "error": "No se encontraron imágenes"
-        }), 400
-
+        return jsonify({"error": "No se encontraron imágenes"}), 400
+        
     files = request.files.getlist('images')
     uploaded_urls = []
 
@@ -544,80 +593,70 @@ def upload_images():
             if file.filename != '':
                 result = cloudinary.uploader.upload(file)
                 uploaded_urls.append(result.get("secure_url"))
-
-        return jsonify({
-            "urls": uploaded_urls
-        }), 200
-
+        
+        return jsonify({"urls": uploaded_urls}), 200
+        
     except Exception as e:
-        return jsonify({
-            "error": str(e)
-        }), 500
+        return jsonify({"error": str(e)}), 500
 
 
 # =============================================================
-# 10. GESTIÓN DE IMÁGENES DEL USUARIO
+# 10. GALERÍA DE USUARIO (User Media)
 # =============================================================
 
-# FOTO DE PERFIL
-@api.route('/profile/avatar', methods=['PUT'])
-@jwt_required()
-def update_profile_avatar():
-    current_user_id = get_jwt_identity()
-
-    user = db.session.get(
-        User,
-        int(current_user_id)
-    )
-
-    if not user:
-        return jsonify({
-            "message": "Usuario no encontrado"
-        }), 404
-
-    data = request.get_json()
-    new_avatar_url = data.get("image_url")
-
-    if not new_avatar_url:
-        return jsonify({
-            "message": "Falta la URL de la imagen"
-        }), 400
-
-    user.avatar = new_avatar_url
-
-    db.session.commit()
-
-    return jsonify({
-        "message": "Foto de perfil actualizada",
-        "user": user.serialize()
-    }), 200
-
-
-# GALERÍA / PUBLICACIONES
 @api.route('/user/media', methods=['POST'])
 @jwt_required()
 def add_media_image():
     current_user_id = get_jwt_identity()
-
     data = request.get_json()
-
+    
     image_url = data.get("image_url")
-
+    
     if not image_url:
-        return jsonify({
-            "message": "Falta la URL de la imagen"
-        }), 400
-
+        return jsonify({"message": "Falta la URL de la imagen"}), 400
+        
     new_media = UserMedia(
         user_id=int(current_user_id),
         image_url=image_url
     )
-
+    
     db.session.add(new_media)
     db.session.commit()
+    
+    return jsonify({"message": "Imagen guardada en la galería", "media": new_media.serialize()}), 201
 
-    return jsonify({
-        "message": "Imagen guardada en la galería",
-        "media": new_media.serialize()
-    }), 201
 
+# =============================================================
+# 11. COMPRA Y GESTIÓN DE ENTRADAS (CHECKOUT)
+# =============================================================
+
+@api.route('/tickets', methods=['POST'])
+@jwt_required()
+def buy_ticket():
+    current_user_id = int(get_jwt_identity())
+    body = request.get_json()
+    
+    event_id = body.get("event_id")
+    if not event_id:
+        return jsonify({"message": "El ID del evento es requerido"}), 400
+        
+    new_ticket = Ticket(
+        user_id=current_user_id,
+        event_id=event_id,
+        ticket_type=body.get("ticket_type", "General")
+    )
+    
+    db.session.add(new_ticket)
+    db.session.commit()
+    
+    return jsonify({"message": "Compra exitosa", "ticket": new_ticket.serialize()}), 201
+
+
+@api.route('/user/tickets', methods=['GET'])
+@jwt_required()
+def get_my_tickets():
+    current_user_id = int(get_jwt_identity())
+    stmt = select(Ticket).where(Ticket.user_id == current_user_id).order_by(Ticket.purchased_at.desc())
+    my_tickets = db.session.scalars(stmt).all()
+    
+    return jsonify([ticket.serialize() for ticket in my_tickets]), 200

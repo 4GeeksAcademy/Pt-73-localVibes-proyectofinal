@@ -36,7 +36,9 @@ export const router = createBrowserRouter(
             <Route path="/events" element={<Events />} />
             <Route path="/map" element={<MapPage />} />
             <Route path="/create-event" element={<CreateEvent />} />
-            <Route path="/favorites" element={<Favorites />} />
+            <Route path="/edit-event/:id" element={<EditEvent />} />
+            <Route element={<Favorites />} path="/favorites" />
+            <Route path="/checkout/:id" element={<Checkout />} />
 
         </Route>
     )

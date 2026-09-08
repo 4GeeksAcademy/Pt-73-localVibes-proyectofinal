@@ -43,8 +43,10 @@ export const InteractiveMap = () => {
             );
         }
 
-        // 2. Cargar los eventos de la semilla desde el Backend
-        fetch(`${process.env.BACKEND_URL}/api/events`)
+        // 2. Cargar los eventos desde el Backend (Corregido a import.meta.env)
+        const backendUrl = import.meta.env.VITE_BACKEND_URL;
+        
+        fetch(`${backendUrl}/api/events`)
             .then((res) => {
                 if (!res.ok) throw new Error("Error en la respuesta del servidor");
                 return res.json();
@@ -83,33 +85,45 @@ export const InteractiveMap = () => {
                             {/* Centrar mapa si cambia la ubicación */}
                             <RecenterAutomatically lat={mapCenter.lat} lng={mapCenter.lng} />
 
-                            {/* Renderizar Marcadores de la Semilla */}
-                            {events.map((event) => (
-                                <Marker key={event.id} position={[event.latitude, event.longitude]}>
-                                    <Popup className="custom-popup">
-                                        <div className="card border-0" style={{ width: "200px" }}>
-                                            {event.image_url && (
-                                                <img 
-                                                    src={event.image_url} 
-                                                    alt={event.title} 
-                                                    className="card-img-top rounded-top"
-                                                    style={{ height: "120px", objectFit: "cover" }}
-                                                />
-                                            )}
-                                            <div className="card-body p-2">
-                                                <h6 className="card-title fw-bold mb-1 text-primary">{event.title}</h6>
-                                                <p className="card-text small text-muted mb-2">
-                                                    <i className="bi bi-geo-alt-fill me-1"></i>
-                                                    {event.location_name || "Ubicación local"}
-                                                </p>
-                                                <div className="d-grid">
-                                                    <button className="btn btn-sm btn-primary">Ver Detalles</button>
+                            {/* Renderizar Marcadores de los Eventos */}
+                            {events.map((event) => {
+                                // 👇 LÓGICA DE CLOUDINARY: Extraemos la imagen de cualquiera de los dos lados 👇
+                                const imageUrl = event.image_url || (event.imgs_event && event.imgs_event.length > 0 ? event.imgs_event[0] : null);
+
+                                return (
+                                    <Marker key={event.id} position={[event.latitude, event.longitude]}>
+                                        <Popup className="custom-popup">
+                                            <div className="card border-0" style={{ width: "200px" }}>
+                                                {imageUrl ? (
+                                                    <img 
+                                                        src={imageUrl} 
+                                                        alt={event.title} 
+                                                        className="card-img-top rounded-top"
+                                                        style={{ height: "120px", objectFit: "cover" }}
+                                                    />
+                                                ) : (
+                                                    <div 
+                                                        className="card-img-top rounded-top d-flex align-items-center justify-content-center bg-secondary text-white"
+                                                        style={{ height: "120px" }}
+                                                    >
+                                                        <i className="bi bi-image fs-1"></i>
+                                                    </div>
+                                                )}
+                                                <div className="card-body p-2">
+                                                    <h6 className="card-title fw-bold mb-1 text-primary">{event.title}</h6>
+                                                    <p className="card-text small text-muted mb-2">
+                                                        <i className="bi bi-geo-alt-fill me-1"></i>
+                                                        {event.location_name || "Ubicación local"}
+                                                    </p>
+                                                    <div className="d-grid">
+                                                        <button className="btn btn-sm btn-primary">Ver Detalles</button>
+                                                    </div>
                                                 </div>
                                             </div>
-                                        </div>
-                                    </Popup>
-                                </Marker>
-                            ))}
+                                        </Popup>
+                                    </Marker>
+                                );
+                            })}
                         </MapContainer>
                     </div>
                 </div>

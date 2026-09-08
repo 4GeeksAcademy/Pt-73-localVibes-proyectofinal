@@ -20,9 +20,7 @@ class User(db.Model):
     name: Mapped[str] = mapped_column(String(100), nullable=False)
     lastname: Mapped[str] = mapped_column(String(100), nullable=False)
     
-    # NUEVO: Campo para la foto de perfil directa
     avatar: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
-
     role: Mapped[Optional[str]] = mapped_column(String(50), default="user")
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     email_verify: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
@@ -33,7 +31,6 @@ class User(db.Model):
     # Relaciones
     events: Mapped[List["Event"]] = relationship(back_populates="organizer")
     favorite_events: Mapped[List["FavoriteEvent"]] = relationship(back_populates="user")
-    # Relación con la nueva tabla de fotos
     media_images: Mapped[List["UserMedia"]] = relationship(back_populates="user")
 
     def serialize(self):
@@ -43,7 +40,7 @@ class User(db.Model):
             "email": self.email,
             "name": self.name,
             "lastname": self.lastname,
-            "avatar": self.avatar, # Incluido en el serialize
+            "avatar": self.avatar, 
             "role": self.role,
             "created_at": self.created_at.isoformat() if self.created_at else None
         }
@@ -201,7 +198,6 @@ class UserMedia(db.Model):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
     # Relación con User
-    # Otra Relación
     user: Mapped["User"] = relationship(back_populates="media_images")
 
     def serialize(self):
