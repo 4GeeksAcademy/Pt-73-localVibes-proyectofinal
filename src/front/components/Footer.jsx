@@ -1,22 +1,23 @@
 import React from "react";
 import { Link } from "react-router-dom";
 import { Send, Heart } from "lucide-react";
+import logo from "../assets/img/Logo Local Vibes 4k.png";
+import "./Footer.css";
 
 export const Footer = () => {
     return (
         <footer className="bg-white text-dark border-top pt-5 pb-3 mt-auto">
             <div className="container">
                 <div className="row g-4 mb-4">
-                    
+
                     {/* COLUMNA 1: LOGO Y DESCRIPCIÓN */}
                     <div className="col-12 col-lg-4">
                         <Link to="/" className="d-flex align-items-center gap-2 text-decoration-none mb-3">
-                            <div className="bg-danger text-white rounded-3 d-flex align-items-center justify-content-center fw-bold fs-5" style={{ width: "36px", height: "36px" }}>
-                                LV
-                            </div>
-                            <span className="fs-4 fw-bold text-dark">
-                                local<span className="text-danger">vibes</span>.
-                            </span>
+                            <img
+                                src={logo}
+                                alt="Local Vibes"
+                                className="footer-logo"
+                            />
                         </Link>
                         <p className="text-muted small mb-3" style={{ maxWidth: "300px" }}>
                             Conectando a Caracas con los mejores eventos locales, conciertos, teatro y experiencias únicas cerca de ti.
@@ -40,7 +41,6 @@ export const Footer = () => {
                     <div className="col-6 col-lg-2">
                         <h6 className="fw-bold mb-3 text-dark">Conecta</h6>
                         <ul className="list-unstyled d-flex flex-column gap-2 small">
-                            <li><Link to="/" className="text-muted text-decoration-none">Inicio</Link></li>
                             <li><Link to="/mapa" className="text-muted text-decoration-none">Mapa Interactivo</Link></li>
                             <li><Link to="/profile" className="text-muted text-decoration-none">Mi Perfil</Link></li>
                             <li><Link to="/profile?tab=entradas" className="text-muted text-decoration-none">Mis Entradas</Link></li>
@@ -53,11 +53,11 @@ export const Footer = () => {
                         <h6 className="fw-bold mb-3 text-dark">Suscríbete al boletín</h6>
                         <p className="text-muted small mb-3">Recibe las mejores recomendaciones de planes en Caracas cada fin de semana.</p>
                         <form onSubmit={(e) => { e.preventDefault(); alert("¡Gracias por suscribirte!"); }} className="d-flex gap-2">
-                            <input 
-                                type="email" 
-                                className="form-control rounded-pill bg-light border-0 px-3 shadow-none" 
-                                placeholder="Tu correo electrónico..." 
-                                required 
+                            <input
+                                type="email"
+                                className="form-control rounded-pill bg-light border-0 px-3 shadow-none"
+                                placeholder="Tu correo electrónico..."
+                                required
                             />
                             <button type="submit" className="btn btn-danger rounded-pill px-4 d-flex align-items-center justify-content-center">
                                 <Send size={16} />

@@ -3,8 +3,9 @@ import { Layout } from "./pages/Layout";
 import { Home } from "./pages/Home";
 import { Login } from "./pages/Login";
 import { Signup } from "./pages/Signup";
+import AuthEmail from "./pages/AuthEmail";
 import { Profile } from "./pages/Profile";
-import { Events } from "./pages/Events"; // 1. IMPORTAMOS LA PÁGINA DE EVENTOS
+import { Events } from "./pages/Events";
 import { MapPage } from "./pages/MapPage";
 import { CreateEvent } from "./pages/CreateEvent";
 import { Favorites } from "./pages/Favorites";
@@ -20,18 +21,22 @@ export const router = createBrowserRouter(
             {/* Página principal de Local Vibes */}
             <Route index element={<Home />} />
 
+            {/* Autenticación */}
             <Route path="/signup" element={<Signup />} />
+            <Route path="/auth-email" element={<AuthEmail />} />
             <Route path="/login" element={<Login />} />
+
+            {/* Perfil */}
             <Route path="/profile" element={<Profile />} />
 
-            {/* Rutas Principales */}
+            {/* Rutas principales */}
             <Route path="/home" element={<Home />} />
-            <Route path="/events" element={<Events />} /> {/* 2. REGISTRAMOS LA RUTA /events */}
             <Route path="/events" element={<Events />} />
             <Route path="/map" element={<MapPage />} />
             <Route path="/create-event" element={<CreateEvent />} />
-            <Route element={<Favorites />} path="/favorites" />
+            <Route path="/favorites" element={<Favorites />} />
 
         </Route>
     )
 );
+
