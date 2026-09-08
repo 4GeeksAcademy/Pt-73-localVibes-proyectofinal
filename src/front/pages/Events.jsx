@@ -13,6 +13,7 @@ export const Events = () => {
 
     const [selectedCategory, setSelectedCategory] = useState("");
     const [selectedCity, setSelectedCity] = useState("");
+    const [selectedPrice, setSelectedPrice] = useState(""); // 👈 Estado del filtro de precio
     
     // Estado que controla si se ve en lista o cuadrícula
     const [viewMode, setViewMode] = useState("list");
@@ -60,7 +61,16 @@ export const Events = () => {
         const matchCategory = selectedCategory ? event.category_id.toString() === selectedCategory : true;
         const matchCity = selectedCity ? (event.address && event.address.toLowerCase().includes(selectedCity.toLowerCase())) : true;
         
-        return matchSearch && matchCategory && matchCity;
+        // Lógica de filtrado por precio
+        let matchPrice = true;
+        const eventPrice = Number(event.price || 0);
+        if (selectedPrice === "free") {
+            matchPrice = eventPrice === 0;
+        } else if (selectedPrice === "paid") {
+            matchPrice = eventPrice > 0;
+        }
+        
+        return matchSearch && matchCategory && matchCity && matchPrice;
     });
 
     const getCategoryName = (id) => {
@@ -69,13 +79,14 @@ export const Events = () => {
     };
 
     const activeCatName = categories.find(c => c.id.toString() === selectedCategory)?.name;
-    const hasActiveFilters = searchTerm !== "" || selectedCategory !== "" || selectedCity !== "";
+    const hasActiveFilters = searchTerm !== "" || selectedCategory !== "" || selectedCity !== "" || selectedPrice !== "";
 
     const clearAllFilters = () => {
         setSearchInput(""); 
         setSearchTerm("");  
         setSelectedCategory("");
         setSelectedCity("");
+        setSelectedPrice("");
     };
 
     return (
@@ -130,7 +141,11 @@ export const Events = () => {
 
                         {/* SELECT: PRECIO */}
                         <div className="col-6 col-md-3 col-lg-2">
-                            <select className="form-select rounded-pill bg-light border-0 shadow-none">
+                            <select 
+                                className="form-select rounded-pill bg-light border-0 shadow-none"
+                                value={selectedPrice}
+                                onChange={(e) => setSelectedPrice(e.target.value)}
+                            >
                                 <option value="">Cualquier precio</option>
                                 <option value="free">Gratis</option>
                                 <option value="paid">De pago</option>
@@ -168,6 +183,11 @@ export const Events = () => {
                             {selectedCity && (
                                 <span className="badge bg-white text-dark border shadow-sm p-2 d-flex align-items-center gap-1 fw-medium rounded-pill">
                                     {selectedCity.charAt(0).toUpperCase() + selectedCity.slice(1)} <X size={14} className="ms-1 text-danger" role="button" onClick={() => setSelectedCity("")} style={{cursor: "pointer"}}/>
+                                </span>
+                            )}
+                            {selectedPrice && (
+                                <span className="badge bg-white text-dark border shadow-sm p-2 d-flex align-items-center gap-1 fw-medium rounded-pill">
+                                    {selectedPrice === "free" ? "Gratis" : "De pago"} <X size={14} className="ms-1 text-danger" role="button" onClick={() => setSelectedPrice("")} style={{cursor: "pointer"}}/>
                                 </span>
                             )}
                             {searchTerm && (
