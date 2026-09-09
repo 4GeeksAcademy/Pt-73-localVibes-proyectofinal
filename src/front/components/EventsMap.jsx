@@ -4,7 +4,6 @@ import 'leaflet/dist/leaflet.css';
 import L from "leaflet";
 import { renderToString } from "react-dom/server"; 
 import { Music, Cpu, Trophy, Utensils, Palette, MapPin } from "lucide-react";
-// Eliminamos Link de react-router-dom porque ya no cambiaremos de ruta
 
 const getCategoryConfig = (catName) => {
     const name = catName?.toLowerCase() || "";
@@ -29,7 +28,6 @@ const createCustomIcon = (categoryName) => {
     });
 };
 
-// 1. Agregamos la prop onOpenModal
 export const EventsMap = ({ events, height = "100vh", onOpenModal }) => {
     const centerPosition = [10.4806, -66.9036]; 
 
@@ -43,16 +41,22 @@ export const EventsMap = ({ events, height = "100vh", onOpenModal }) => {
             
             {events.map((event) => {
                 if (event.latitude && event.longitude) {
+                    // Obtenemos la imagen correcta desde imgs_event (arreglo) o image_url por compatibilidad
+                    const eventImage = (event.imgs_event && event.imgs_event.length > 0) 
+                        ? event.imgs_event[0] 
+                        : (event.image_url || "https://images.unsplash.com/photo-1501386761578-eac5c94b800a");
+
                     return (
+                        // Incluimos la imagen en la key para forzar el redibujado de Leaflet al editarse
                         <Marker 
-                            key={event.id} 
+                            key={`${event.id}-${eventImage}`} 
                             position={[event.latitude, event.longitude]}
                             icon={createCustomIcon(event.categoryName)}
                         >
                             <Popup className="rounded-4 shadow-lg border-0">
                                 <div style={{ minWidth: "180px" }}>
                                     <img 
-                                        src={event.image_url || "https://images.unsplash.com/photo-1501386761578-eac5c94b800a"} 
+                                        src={eventImage} 
                                         alt={event.title} 
                                         style={{ width: "100%", height: "100px", objectFit: "cover", borderRadius: "8px", marginBottom: "8px" }} 
                                     />
@@ -64,7 +68,6 @@ export const EventsMap = ({ events, height = "100vh", onOpenModal }) => {
                                         <MapPin size={12} className="me-1"/> {event.location_name}
                                     </p>
                                     
-                                    {/* 2. Cambiamos el <Link> por un <button> que ejecuta onOpenModal */}
                                     <button 
                                         onClick={() => onOpenModal(event)} 
                                         className="btn btn-dark btn-sm w-100 rounded-pill fw-medium shadow-sm"

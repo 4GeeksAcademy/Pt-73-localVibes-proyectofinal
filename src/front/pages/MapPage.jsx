@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { EventsMap } from "../components/EventsMap";
-import { EventModal } from "../components/EventModal"; // <-- Importamos el Modal
+import { EventModal } from "../components/EventModal";
 import { Search, MapPin, Layers, X } from "lucide-react";
 
 export const MapPage = () => {
@@ -8,7 +8,6 @@ export const MapPage = () => {
     const [categories, setCategories] = useState([]);
     const [loading, setLoading] = useState(true);
 
-    // NUEVO ESTADO: Controla el evento que se mostrará en el Modal
     const [selectedEvent, setSelectedEvent] = useState(null);
 
     const [searchTerm, setSearchTerm] = useState("");
@@ -17,19 +16,32 @@ export const MapPage = () => {
 
     const backendUrl = import.meta.env.VITE_BACKEND_URL;
 
+    // Cargar categorías una sola vez al montar el componente
     useEffect(() => {
         fetch(`${backendUrl}/api/categories`)
             .then(res => res.json())
             .then(data => setCategories(data))
             .catch(err => console.error(err));
+    }, [backendUrl]);
 
-        fetch(`${backendUrl}/api/events`)
-            .then(res => res.json())
-            .then(data => {
-                setEvents(data);
-                setLoading(false);
-            })
-            .catch(err => console.error(err));
+    // Cargar y recargar eventos dinámicamente al enfocar la pestaña o montar la vista
+    useEffect(() => {
+        const fetchEvents = () => {
+            fetch(`${backendUrl}/api/events`)
+                .then(res => res.json())
+                .then(data => {
+                    setEvents(data);
+                    setLoading(false);
+                })
+                .catch(err => console.error(err));
+        };
+
+        // Carga inicial
+        fetchEvents();
+
+        // Se ejecuta cada vez que el usuario vuelve a enfocar la ventana (ej: regresa de Editar Evento)
+        window.addEventListener("focus", fetchEvents);
+        return () => window.removeEventListener("focus", fetchEvents);
     }, [backendUrl]);
 
     const filteredEvents = events.filter(event => {
@@ -126,11 +138,15 @@ export const MapPage = () => {
                     <div className="spinner-border text-danger" role="status"></div>
                 </div>
             ) : (
-                // Pasamos la función setSelectedEvent al mapa
-                <EventsMap events={eventsWithCategory} height="100%" onOpenModal={setSelectedEvent} />
+                /* La 'key' dinámica obliga a Leaflet a destruir y recrear los marcadores/popups con la nueva imagen */
+                <EventsMap 
+                    key={eventsWithCategory.map(e => `${e.id}-${e.imgs_event?.[0]}`).join("_")}
+                    events={eventsWithCategory} 
+                    height="100%" 
+                    onOpenModal={setSelectedEvent} 
+                />
             )}
 
-            {/* RENDERIZADO DEL MODAL (Aparece superpuesto cuando se selecciona un evento) */}
             {selectedEvent && (
                 <EventModal 
                     event={selectedEvent} 

@@ -64,7 +64,7 @@ export const EditEvent = () => {
     const [isLoggedIn, setIsLoggedIn] = useState(true);
     const [categories, setCategories] = useState([]);
     const [isSubmitting, setIsSubmitting] = useState(false);
-    const [isLoadingData, setIsLoadingData] = useState(true); // Nuevo estado para carga inicial
+    const [isLoadingData, setIsLoadingData] = useState(true); 
     const [error, setError] = useState("");
     
     const [timeError, setTimeError] = useState("");
@@ -97,7 +97,6 @@ export const EditEvent = () => {
             return;
         }
 
-        // Cargar categorías y datos del evento al mismo tiempo
         Promise.all([
             fetch(`${backendUrl}/api/categories`).then(res => res.json()),
             fetch(`${backendUrl}/api/events/${id}`).then(res => res.json())
@@ -105,10 +104,8 @@ export const EditEvent = () => {
         .then(([catsData, eventData]) => {
             setCategories(catsData);
             
-            // 1. Extraer la fecha del start_time ("YYYY-MM-DD")
             const datePart = eventData.start_time ? eventData.start_time.split("T")[0] : "";
             
-            // 2. Extraer la hora de inicio y fin (requiere un poco de parseo matemático)
             let newTime = { ...time };
             
             if (eventData.start_time && eventData.start_time.includes("T")) {
@@ -132,14 +129,12 @@ export const EditEvent = () => {
                 newTime.endM = eM;
             }
 
-            // 3. Limpiar la descripción (quitar el texto extra de la hora si lo guardamos antes)
             let cleanDescription = eventData.description || "";
             if (cleanDescription.includes("Hora de finalización estimada:")) {
                 const splitDesc = cleanDescription.split("\n\n");
                 cleanDescription = splitDesc.length > 1 ? splitDesc.slice(1).join("\n\n") : "";
             }
 
-            // 4. Llenar el formulario con los datos reales
             setFormData({
                 title: eventData.title || "",
                 category_id: eventData.category_id || "",
@@ -170,12 +165,7 @@ export const EditEvent = () => {
     }, [backendUrl, id]);
 
     useEffect(() => {
-        if (formData.event_date && formData.event_date < today) {
-            // Nota: En edición permitimos fechas pasadas si el evento ya pasó y solo quieren corregir algo de texto.
-            setDateError(""); 
-        } else {
-            setDateError("");
-        }
+        setDateError("");
     }, [formData.event_date, today]);
 
     useEffect(() => {
@@ -228,17 +218,22 @@ export const EditEvent = () => {
         try {
             let uploadedImagesUrls = [];
             
-            // LÓGICA DE SUBIDA INTELIGENTE 
             if (eventImage) {
                 if (typeof eventImage === "string") {
                     uploadedImagesUrls.push(eventImage);
+                } else if (Array.isArray(eventImage) && eventImage.length > 0) {
+                    uploadedImagesUrls = eventImage;
                 } else {
                     const cloudData = new FormData();
                     cloudData.append("file", eventImage); 
                     cloudData.append("upload_preset", "TU_UPLOAD_PRESET");
-                    const cloudRes = await fetch(`https://api.cloudinary.com/v1_1/TU_CLOUD_NAME/image/upload`, { method: "POST", body: cloudData });
+                    const cloudRes = await fetch(`https://api.cloudinary.com/v1_1/shhfhqyk/image/upload`, { 
+                        method: "POST", 
+                        body: cloudData 
+                    });
                     if (!cloudRes.ok) throw new Error("Error subiendo la imagen a Cloudinary");
-                    uploadedImagesUrls.push((await cloudRes.json()).secure_url);
+                    const cloudJson = await cloudRes.json();
+                    uploadedImagesUrls.push(cloudJson.secure_url);
                 }
             }
 
@@ -258,18 +253,20 @@ export const EditEvent = () => {
                 imgs_event: uploadedImagesUrls
             };
 
-            // 👇 AQUI HACEMOS EL PUT A LA RUTA CON EL ID 👇
             const response = await fetch(`${backendUrl}/api/events/${id}`, {
                 method: "PUT",
                 headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
                 body: JSON.stringify(finalEventData)
             });
 
-            if (response.ok) navigate("/profile"); // Volvemos al perfil
+            if (response.ok) navigate("/profile"); 
             else throw new Error((await response.json()).message || "Error al actualizar el evento");
 
-        } catch (err) { setError(err.message); } 
-        finally { setIsSubmitting(false); }
+        } catch (err) { 
+            setError(err.message); 
+        } finally { 
+            setIsSubmitting(false); 
+        }
     };
 
     if (isLoadingData && isLoggedIn) {
@@ -307,7 +304,13 @@ export const EditEvent = () => {
                         <label className="form-label fw-bold">Imagen del evento (Flyer)</label>
                         <ImageUpload 
                             currentImage={typeof eventImage === 'string' ? eventImage : null}
-                            onImagesUploaded={(urls) => setEventImage(urls[0])} 
+                            onImagesUploaded={(urls) => {
+                                if (Array.isArray(urls) && urls.length > 0) {
+                                    setEventImage(urls[0]);
+                                } else {
+                                    setEventImage(urls);
+                                }
+                            }} 
                         />
                     </div>
 
