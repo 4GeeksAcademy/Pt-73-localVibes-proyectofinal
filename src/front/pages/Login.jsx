@@ -122,7 +122,7 @@ export const Login = () => {
                                     <input type="checkbox" className="form-check-input shadow-none" id="rememberMe" />
                                     <label className="form-check-label text-muted" htmlFor="rememberMe">Recuérdame</label>
                                 </div>
-                                <a href="#" className="text-decoration-none fw-bold" style={{ color: "#ef4444" }}>¿Olvidaste tu contraseña?</a>
+                                {/* <a href="#" className="text-decoration-none fw-bold" style={{ color: "#ef4444" }}>¿Olvidaste tu contraseña?</a> */}
                             </div>
 
                             {/* Botón Principal */}
